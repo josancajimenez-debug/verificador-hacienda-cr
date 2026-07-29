@@ -4,7 +4,9 @@ Aplicación web para consultar información pública mediante las **API oficiale
 
 Referencia técnica única: <https://api.hacienda.go.cr/docs>
 
-Un solo archivo `index.html`, autónomo, sin dependencias, sin compilación y sin backend. Funciona en computadoras, tabletas y teléfonos móviles.
+Un solo `index.html` con todo el código (HTML, CSS y JavaScript) integrado: sin dependencias, sin compilación y sin backend. Funciona en computadoras, tabletas y teléfonos móviles.
+
+Junto al HTML viajan dos recursos que la interfaz muestra o enlaza: el logo `ACC.CONTADORES.jpg` y la carpeta `BIBLIOGRAFÍA/` con los ocho documentos legales citados en los paneles informativos. Consérvelos en la misma carpeta.
 
 ---
 
@@ -28,7 +30,7 @@ Un solo archivo `index.html`, autónomo, sin dependencias, sin compilación y si
 
 ## 1. Puesta en marcha en 30 segundos
 
-**Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada ni levantar un servidor: la aplicación consulta directamente los servicios oficiales.
+**Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada ni levantar un servidor: la aplicación consulta directamente los servicios oficiales. Mantenga a su lado `ACC.CONTADORES.jpg` y la carpeta `BIBLIOGRAFÍA/` para que se vea el logo y funcionen los enlaces a los documentos legales.
 
 **Aplicación ya publicada:** <https://josancajimenez-debug.github.io/verificador-hacienda-cr/>
 
@@ -44,9 +46,12 @@ Requisitos del navegador: soporte de `fetch`, `async/await`, `Intl` y variables 
 
 ```
 VERIFICADOR/
-├── index.html                 ← LA APLICACIÓN. Único archivo necesario.
-│                                 (incluye el logo de ACC Contadores incrustado)
-├── ACC.CONTADORES.jpg         ← Logo original, por si desea reemplazarlo.
+├── index.html                 ← LA APLICACIÓN.
+├── ACC.CONTADORES.jpg         ← Logo de ACC Contadores que muestra la cabecera.
+│
+├── BIBLIOGRAFÍA/              ← Ocho documentos legales que la app enlaza desde
+│                                 los paneles informativos y las referencias.
+│                                 Deben acompañar al index.html.
 ├── README.md                  ← Este documento.
 ├── PRUEBAS.md                 ← Resultados y evidencia de las pruebas.
 │
@@ -57,8 +62,10 @@ VERIFICADOR/
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
     ├── pruebas-logica.js      ← 60 pruebas de validadores y normalizadores.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
-    ├── pruebas-navegador.js   ← 46 pruebas en Chrome (interfaz, a11y, móvil).
-    ├── pruebas-sitio-publicado.js ← 8 pruebas contra la URL pública ya desplegada.
+    ├── pruebas-estructura.js  ← 10 auditorías del DOM (ids, ARIA, alt, encabezados).
+    ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
+    ├── pruebas-navegador.js   ← 47 pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
 
@@ -204,7 +211,7 @@ Access-Control-Allow-Origin: *
 X-Origin-App: api.hacienda.go.cr
 ```
 
-Por lo tanto se entrega **un único `index.html` autónomo**, tal como es preferible: sin backend, publicable en GitHub Pages y compartible mediante un simple enlace.
+Por lo tanto se entrega **un `index.html` sin backend**, tal como es preferible: publicable en GitHub Pages y compartible mediante un simple enlace, con todo el código integrado en el propio archivo.
 
 **Matiz importante y verificado.** Las respuestas **400** y **404** no las genera la aplicación de origen sino la capa estática de Akamai, y **no** incluyen cabeceras CORS:
 
@@ -323,7 +330,7 @@ En pocos minutos estará disponible en `https://USUARIO.github.io/verificador-ha
 | **Cloudflare Pages** | Conecte el repositorio; sin comando de compilación, directorio raíz. |
 | **Vercel** | `vercel --prod` en la carpeta del proyecto. |
 | **Intranet o servidor propio** | Copie `index.html` a cualquier carpeta servida por Apache, IIS o Nginx. |
-| **Sin Internet en el servidor** | Envíe el archivo `index.html`; se abre con doble clic. Requiere conexión sólo para consultar la API. |
+| **Por correo o memoria USB** | Envíe la carpeta completa (`index.html`, el logo y `BIBLIOGRAFÍA/`); se abre con doble clic. Requiere conexión sólo para consultar la API. |
 
 Se recomienda servir la aplicación por **HTTPS**: el botón «Copiar código CABYS» utiliza la API moderna del portapapeles, que muchos navegadores restringen a contextos seguros (existe un mecanismo alternativo, pero es menos fiable).
 
@@ -414,9 +421,11 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 |---|---|---|
 | Lógica pura (validadores, normalizadores, clasificadores) | 60 | 60 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
-| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 46 | 46 correctos |
-| Sitio publicado (URL pública real) | 8 | 8 correctos |
-| **Total** | **130** | **130 correctos** |
+| Estructura y accesibilidad del DOM | 10 | 10 correctos |
+| Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
+| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 47 | 47 correctos |
+| Sitio publicado (URL pública real) | 10 | 10 correctos |
+| **Total** | **159** | **159 correctos** |
 
 Cómo ejecutarlas (Node.js 18 o superior):
 
