@@ -1,0 +1,3228 @@
+<!DOCTYPE html>
+<html lang="es-CR" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Consulta de información pública del Ministerio de Hacienda de Costa Rica: situación tributaria, tipo de cambio, exoneraciones, registro agropecuario, registro pesquero y catálogo CABYS. Herramienta de ACC Contadores.">
+<meta name="referrer" content="no-referrer">
+<title>Verificador Hacienda CR — ACC Contadores</title>
+
+<!--
+  ============================================================================
+  VERIFICADOR HACIENDA CR
+  Aplicación web de consulta a las API públicas del Ministerio de Hacienda
+  de Costa Rica.  Referencia técnica oficial: https://api.hacienda.go.cr/docs
+
+  Archivo único y autónomo: HTML5 + CSS3 + JavaScript (ES2020+).
+  No requiere dependencias externas, ni compilación, ni servidor backend.
+
+  ORGANIZACIÓN DEL CÓDIGO (buscar los separadores "== §" para navegar):
+    § 1  Estilos
+    § 2  Marcado de la interfaz
+    § 3  Utilidades DOM y de formato
+    § 4  Configuración y catálogos
+    § 5  Caché temporal en memoria
+    § 6  Limitador de tasa (rate limiter) y deduplicación
+    § 7  Cliente HTTP: errores tipificados, timeout, reintentos, CORS
+    § 8  Componente de tabla (filtro, orden, paginación, CSV, copiar)
+    § 9  Infraestructura de la interfaz (pestañas, tema, alertas)
+    § 10 Módulo 1 — Situación tributaria      /fe/ae
+    § 11 Módulo 2 — Tipo de cambio del dólar  /indicadores/tc/dolar
+    § 12 Módulo 3 — Exoneraciones             /fe/ex
+    § 13 Módulo 4 — Productores agropecuarios /fe/agropecuario
+    § 14 Módulo 5 — Registro pesquero         /fe/pesca
+    § 15 Módulo 6 — Catálogo CABYS            /fe/cabys
+    § 16 Arranque
+
+  SEGURIDAD: ningún dato recibido de la API se inserta con innerHTML.
+  Todo el contenido dinámico se crea con document.createElement y textContent.
+
+  PRIVACIDAD: los números de identificación NO se persisten. La caché vive
+  únicamente en memoria (Map) y se pierde al recargar o al pulsar
+  "Limpiar caché". En localStorage sólo se guardan preferencias no
+  personales: tema visual y, opcionalmente, la URL de un proxy propio.
+  ============================================================================
+-->
+
+<style>
+/* == § 1 · ESTILOS ======================================================== */
+
+/* --- 1.1 Sistema de diseño: tokens de color, tipografía y espaciado ------ */
+:root{
+  --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Paleta institucional (azul del Ministerio de Hacienda como referencia) */
+  --brand-900:#0f1c3f;
+  --brand-700:#182951;
+  --brand-500:#2b4a8f;
+  --brand-300:#6d8bd0;
+
+  --radius-sm:6px;
+  --radius:10px;
+  --radius-lg:16px;
+
+  --space-1:4px;  --space-2:8px;  --space-3:12px;
+  --space-4:16px; --space-5:24px; --space-6:32px;
+
+  --shadow-1:0 1px 2px rgba(15,28,63,.08), 0 1px 3px rgba(15,28,63,.06);
+  --shadow-2:0 4px 12px rgba(15,28,63,.10), 0 2px 4px rgba(15,28,63,.06);
+
+  --maxw:1180px;
+  --tap:44px; /* objetivo táctil mínimo accesible */
+}
+
+/* Tema claro (predeterminado) */
+:root,
+:root[data-theme="light"]{
+  --bg:#eef1f7;
+  --bg-elev:#ffffff;
+  --bg-sunken:#f6f8fc;
+  --bg-inset:#eaeef6;
+  --text:#14203c;
+  --text-soft:#4a5878;
+  --text-faint:#6b7896;
+  --border:#d3daea;
+  --border-strong:#b6c1da;
+  --accent:#1e3a75;
+  --accent-text:#ffffff;
+  --accent-soft:#e5ecfb;
+  --focus:#0a58ca;
+
+  --ok-bg:#e6f6ec;      --ok-fg:#0f5132;      --ok-bd:#a6d9b9;
+  --warn-bg:#fff5e0;    --warn-fg:#664100;    --warn-bd:#e8cb8a;
+  --err-bg:#fdeaea;     --err-fg:#8a1c1c;     --err-bd:#eeb0b0;
+  --info-bg:#e7f0fb;    --info-fg:#123a6b;    --info-bd:#a9c7ea;
+}
+
+/* Tema oscuro manual */
+:root[data-theme="dark"]{
+  --bg:#0c1222;
+  --bg-elev:#141d33;
+  --bg-sunken:#111a2e;
+  --bg-inset:#1b2542;
+  --text:#e8edf9;
+  --text-soft:#aebada;
+  --text-faint:#8494b8;
+  --border:#293556;
+  --border-strong:#3b4a75;
+  --accent:#7ba3f0;
+  --accent-text:#0c1222;
+  --accent-soft:#1b2748;
+  --focus:#8fb6ff;
+
+  --ok-bg:#12301f;      --ok-fg:#8fe0ad;      --ok-bd:#2c5c3f;
+  --warn-bg:#33280d;    --warn-fg:#f2cf80;    --warn-bd:#6b5520;
+  --err-bg:#3a1616;     --err-fg:#f4a6a6;     --err-bd:#733232;
+  --info-bg:#132441;    --info-fg:#a8c8f4;    --info-bd:#2c4877;
+}
+
+/* Tema automático: sigue la preferencia del sistema operativo */
+@media (prefers-color-scheme: dark){
+  :root[data-theme="auto"]{
+    --bg:#0c1222;
+    --bg-elev:#141d33;
+    --bg-sunken:#111a2e;
+    --bg-inset:#1b2542;
+    --text:#e8edf9;
+    --text-soft:#aebada;
+    --text-faint:#8494b8;
+    --border:#293556;
+    --border-strong:#3b4a75;
+    --accent:#7ba3f0;
+    --accent-text:#0c1222;
+    --accent-soft:#1b2748;
+    --focus:#8fb6ff;
+
+    --ok-bg:#12301f;    --ok-fg:#8fe0ad;    --ok-bd:#2c5c3f;
+    --warn-bg:#33280d;  --warn-fg:#f2cf80;  --warn-bd:#6b5520;
+    --err-bg:#3a1616;   --err-fg:#f4a6a6;   --err-bd:#733232;
+    --info-bg:#132441;  --info-fg:#a8c8f4;  --info-bd:#2c4877;
+  }
+}
+
+/* --- 1.2 Base ----------------------------------------------------------- */
+*,*::before,*::after{ box-sizing:border-box; }
+
+/* El atributo `hidden` debe imponerse siempre. Sin esta regla, cualquier
+   clase con `display` explícito (por ejemplo .field{display:flex}) anularía
+   la declaración `[hidden]{display:none}` de la hoja del navegador y el
+   elemento seguiría viéndose pese a estar marcado como oculto. */
+[hidden]{ display:none !important; }
+
+html{ -webkit-text-size-adjust:100%; }
+
+body{
+  margin:0;
+  font-family:var(--font-ui);
+  font-size:16px;
+  line-height:1.55;
+  color:var(--text);
+  background:var(--bg);
+  -webkit-font-smoothing:antialiased;
+  overflow-wrap:break-word;
+}
+
+h1,h2,h3,h4{ margin:0; line-height:1.25; font-weight:650; }
+
+a{ color:var(--accent); }
+:root[data-theme="light"] a{ color:var(--brand-500); }
+
+/* Foco visible y consistente en todos los elementos interactivos */
+:where(a,button,input,select,textarea,summary,[tabindex]):focus-visible{
+  outline:3px solid var(--focus);
+  outline-offset:2px;
+  border-radius:var(--radius-sm);
+}
+
+/* Enlace de salto para usuarios de teclado y lectores de pantalla */
+.skip-link{
+  position:absolute; left:-9999px; top:0; z-index:100;
+  background:var(--accent); color:var(--accent-text);
+  padding:var(--space-3) var(--space-4);
+  border-radius:0 0 var(--radius) 0; font-weight:600;
+}
+.skip-link:focus{ left:0; }
+
+/* Contenido sólo para lectores de pantalla */
+.sr-only{
+  position:absolute !important; width:1px; height:1px;
+  padding:0; margin:-1px; overflow:hidden;
+  clip:rect(0,0,0,0); white-space:nowrap; border:0;
+}
+
+/* --- 1.3 Encabezado ----------------------------------------------------- */
+.app-header{
+  background:linear-gradient(135deg,var(--brand-900),var(--brand-700) 55%,var(--brand-500));
+  color:#fff;
+  padding:var(--space-4) var(--space-4) var(--space-5);
+  box-shadow:var(--shadow-2);
+}
+.app-header__inner{
+  max-width:var(--maxw); margin:0 auto;
+  display:flex; flex-wrap:wrap; gap:var(--space-4);
+  align-items:center; justify-content:space-between;
+}
+.brand{ display:flex; align-items:center; gap:var(--space-4); min-width:0; }
+
+/* Logotipo de la cabecera: recorte de la marca (ACC + visto bueno), que es
+   la parte legible a tamaño reducido. El logo institucional completo, con
+   el lema y el teléfono, se muestra en el pie a un tamaño adecuado. */
+.brand__logo{
+  width:auto; height:52px; flex:0 0 auto;
+  border-radius:10px;
+  background:#fff;
+  padding:6px 10px;
+  box-shadow:0 2px 10px rgba(0,0,0,.22);
+  object-fit:contain;
+}
+.brand__text{ min-width:0; }
+.brand__title{ font-size:1.22rem; letter-spacing:.2px; }
+.brand__sub{ font-size:.8rem; opacity:.85; margin-top:2px; }
+.brand__firm{ font-size:.78rem; opacity:.75; margin:4px 0 0; }
+.brand__firm strong{ opacity:1; }
+
+.header-tools{ display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; }
+
+.tool-btn{
+  min-height:var(--tap);
+  display:inline-flex; align-items:center; gap:var(--space-2);
+  padding:var(--space-2) var(--space-3);
+  font:inherit; font-size:.86rem; font-weight:600;
+  color:#fff; background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.3);
+  border-radius:var(--radius); cursor:pointer;
+  transition:background .15s ease;
+}
+.tool-btn:hover{ background:rgba(255,255,255,.24); }
+.tool-btn:focus-visible{ outline-color:#fff; }
+
+/* Encabezado en tabletas: el bloque de marca ocupa el ancho y los
+   controles pasan debajo, alineados a la izquierda. */
+@media (max-width:760px){
+  .app-header{ padding:var(--space-3) var(--space-3) var(--space-4); }
+  .app-header__inner{ gap:var(--space-3); }
+  .brand{ flex:1 1 100%; gap:var(--space-3); }
+  .brand__logo{ height:54px; }
+  .brand__title{ font-size:1.06rem; }
+  .brand__sub{ font-size:.75rem; }
+  .header-tools{ flex:1 1 100%; }
+  .tool-btn{ flex:1 1 auto; justify-content:center; }
+}
+
+/* Teléfonos: se reduce el logo y se oculta el subtítulo largo, que en dos
+   líneas desplazaba el contenido sin aportar información nueva. */
+@media (max-width:430px){
+  .brand__logo{ height:46px; padding:4px; }
+  .brand__title{ font-size:1rem; }
+  .brand__sub{ display:none; }
+  .brand__firm{ font-size:.72rem; }
+}
+
+/* --- 1.4 Navegación por módulos (pestañas) ------------------------------ */
+.nav-wrap{
+  position:sticky; top:0; z-index:20;
+  background:var(--bg-elev);
+  border-bottom:1px solid var(--border);
+  box-shadow:var(--shadow-1);
+}
+.tablist{
+  max-width:var(--maxw); margin:0 auto;
+  display:flex; gap:var(--space-1);
+  overflow-x:auto; scrollbar-width:thin;
+  padding:var(--space-2) var(--space-3);
+  -webkit-overflow-scrolling:touch;
+}
+.tab{
+  flex:0 0 auto;
+  min-height:var(--tap);
+  display:inline-flex; align-items:center; gap:var(--space-2);
+  padding:var(--space-2) var(--space-4);
+  font:inherit; font-size:.9rem; font-weight:600;
+  color:var(--text-soft); background:transparent;
+  border:1px solid transparent; border-radius:var(--radius);
+  cursor:pointer; white-space:nowrap;
+  transition:background .15s ease,color .15s ease;
+}
+.tab:hover{ background:var(--bg-inset); color:var(--text); }
+.tab[aria-selected="true"]{
+  background:var(--accent); color:var(--accent-text);
+  border-color:var(--accent); box-shadow:var(--shadow-1);
+}
+.tab__ico{ font-size:1.05rem; line-height:1; }
+
+/* --- 1.5 Contenedor principal y tarjetas -------------------------------- */
+main{ max-width:var(--maxw); margin:0 auto; padding:var(--space-5) var(--space-4) var(--space-6); }
+
+.panel[hidden]{ display:none; }
+
+.card{
+  background:var(--bg-elev);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-1);
+  overflow:hidden;
+  margin-bottom:var(--space-5);
+}
+.card__head{
+  padding:var(--space-4) var(--space-5);
+  border-bottom:1px solid var(--border);
+  background:var(--bg-sunken);
+}
+.card__title{ font-size:1.08rem; display:flex; align-items:center; gap:var(--space-2); }
+.card__desc{ margin:var(--space-2) 0 0; color:var(--text-soft); font-size:.9rem; }
+.card__endpoint{
+  display:inline-block; margin-top:var(--space-2);
+  font-family:var(--font-mono); font-size:.76rem;
+  color:var(--text-faint);
+  background:var(--bg-inset);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  padding:2px var(--space-2);
+  overflow-wrap:anywhere;
+}
+.card__body{ padding:var(--space-5); }
+
+/* --- 1.6 Formularios ---------------------------------------------------- */
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:var(--space-4);
+  align-items:start;
+}
+.field{ display:flex; flex-direction:column; gap:var(--space-2); min-width:0; }
+.field--wide{ grid-column:1 / -1; }
+
+.field label{ font-weight:600; font-size:.9rem; }
+.field .hint{ font-size:.8rem; color:var(--text-faint); }
+
+.input,.select{
+  width:100%; min-height:var(--tap);
+  padding:var(--space-2) var(--space-3);
+  font:inherit; font-size:.95rem;
+  color:var(--text); background:var(--bg-sunken);
+  border:1px solid var(--border-strong);
+  border-radius:var(--radius);
+  transition:border-color .15s ease, box-shadow .15s ease;
+}
+.input:hover,.select:hover{ border-color:var(--accent); }
+.input:focus,.select:focus{
+  outline:none; border-color:var(--focus);
+  box-shadow:0 0 0 3px color-mix(in srgb, var(--focus) 30%, transparent);
+}
+.input[aria-invalid="true"]{ border-color:var(--err-bd); background:var(--err-bg); }
+.input--mono{ font-family:var(--font-mono); letter-spacing:.5px; }
+
+.field-error{
+  font-size:.82rem; color:var(--err-fg); font-weight:600;
+  display:none;
+}
+.field-error:not(:empty){ display:block; }
+
+/* --- 1.7 Botones -------------------------------------------------------- */
+.actions{
+  display:flex; flex-wrap:wrap; gap:var(--space-3);
+  margin-top:var(--space-5);
+  padding-top:var(--space-4);
+  border-top:1px solid var(--border);
+}
+.btn{
+  min-height:var(--tap);
+  display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2);
+  padding:var(--space-2) var(--space-5);
+  font:inherit; font-size:.93rem; font-weight:650;
+  border-radius:var(--radius); cursor:pointer;
+  border:1px solid var(--border-strong);
+  background:var(--bg-sunken); color:var(--text);
+  transition:transform .08s ease, background .15s ease, border-color .15s ease;
+}
+.btn:hover:not(:disabled){ background:var(--bg-inset); border-color:var(--accent); }
+.btn:active:not(:disabled){ transform:translateY(1px); }
+.btn:disabled{ opacity:.55; cursor:not-allowed; }
+.btn--primary{
+  background:var(--accent); color:var(--accent-text); border-color:var(--accent);
+}
+.btn--primary:hover:not(:disabled){ filter:brightness(1.1); background:var(--accent); }
+.btn--sm{ min-height:34px; padding:var(--space-1) var(--space-3); font-size:.82rem; }
+.btn--ghost{ background:transparent; }
+
+/* --- 1.8 Indicador de proceso ------------------------------------------- */
+.loader{
+  display:none;
+  align-items:center; gap:var(--space-3);
+  margin-top:var(--space-4);
+  padding:var(--space-3) var(--space-4);
+  background:var(--info-bg); color:var(--info-fg);
+  border:1px solid var(--info-bd); border-radius:var(--radius);
+  font-size:.9rem; font-weight:600;
+}
+.loader[data-active="true"]{ display:flex; }
+.spinner{
+  width:20px; height:20px; flex:0 0 20px;
+  border:3px solid currentColor; border-top-color:transparent;
+  border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
+  .spinner{ border-top-color:currentColor; opacity:.6; }
+}
+
+/* --- 1.9 Mensajes de estado --------------------------------------------- */
+.alert{
+  margin-top:var(--space-4);
+  padding:var(--space-3) var(--space-4);
+  border-radius:var(--radius);
+  border:1px solid;
+  font-size:.92rem;
+  display:flex; gap:var(--space-3); align-items:flex-start;
+}
+.alert__ico{ font-size:1.15rem; line-height:1.3; flex:0 0 auto; }
+.alert__body{ min-width:0; }
+.alert__title{ font-weight:700; margin-bottom:2px; }
+.alert__detail{ font-size:.85rem; opacity:.9; margin-top:var(--space-2); }
+.alert--ok{   background:var(--ok-bg);   color:var(--ok-fg);   border-color:var(--ok-bd); }
+.alert--warn{ background:var(--warn-bg); color:var(--warn-fg); border-color:var(--warn-bd); }
+.alert--err{  background:var(--err-bg);  color:var(--err-fg);  border-color:var(--err-bd); }
+.alert--info{ background:var(--info-bg); color:var(--info-fg); border-color:var(--info-bd); }
+
+/* --- 1.10 Presentación de resultados ------------------------------------ */
+.result{ margin-top:var(--space-5); }
+.result:empty{ margin-top:0; }
+
+.result-head{
+  display:flex; flex-wrap:wrap; gap:var(--space-3);
+  align-items:baseline; justify-content:space-between;
+  margin-bottom:var(--space-4);
+}
+.result-title{ font-size:1.05rem; }
+.result-meta{ font-size:.8rem; color:var(--text-faint); }
+
+/* Lista descriptiva de pares campo/valor */
+.dl{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+  gap:var(--space-3);
+  margin:0;
+}
+.dl__item{
+  background:var(--bg-sunken);
+  border:1px solid var(--border);
+  border-left:4px solid var(--accent);
+  border-radius:var(--radius);
+  padding:var(--space-3);
+  min-width:0;
+}
+.dl__item--full{ grid-column:1 / -1; }
+.dl__k{
+  font-size:.74rem; font-weight:700; letter-spacing:.5px;
+  text-transform:uppercase; color:var(--text-faint);
+  margin-bottom:var(--space-1);
+}
+.dl__v{ font-size:.98rem; font-weight:600; overflow-wrap:anywhere; }
+.dl__v--mono{ font-family:var(--font-mono); }
+.dl__note{ font-size:.76rem; color:var(--text-faint); font-weight:400; margin-top:2px; }
+
+/* Distintivos de estado */
+.badge{
+  display:inline-block;
+  padding:2px var(--space-3);
+  border-radius:999px;
+  font-size:.8rem; font-weight:700;
+  border:1px solid;
+}
+.badge--ok{   background:var(--ok-bg);   color:var(--ok-fg);   border-color:var(--ok-bd); }
+.badge--warn{ background:var(--warn-bg); color:var(--warn-fg); border-color:var(--warn-bd); }
+.badge--err{  background:var(--err-bg);  color:var(--err-fg);  border-color:var(--err-bd); }
+.badge--neutral{ background:var(--bg-inset); color:var(--text-soft); border-color:var(--border-strong); }
+
+.subhead{
+  margin:var(--space-5) 0 var(--space-3);
+  font-size:.95rem; font-weight:700;
+  display:flex; align-items:center; gap:var(--space-2);
+  color:var(--text);
+}
+
+/* --- 1.11 Tablas responsive --------------------------------------------- */
+.table-tools{
+  display:flex; flex-wrap:wrap; gap:var(--space-3);
+  align-items:center; justify-content:space-between;
+  margin-bottom:var(--space-3);
+}
+.table-tools__group{ display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; }
+.table-filter{ min-width:180px; max-width:320px; flex:1 1 200px; }
+
+.table-scroll{
+  overflow-x:auto;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--bg-elev);
+  -webkit-overflow-scrolling:touch;
+}
+table.data{
+  width:100%; border-collapse:collapse; font-size:.88rem;
+}
+table.data th, table.data td{
+  padding:var(--space-3);
+  text-align:left; vertical-align:top;
+  border-bottom:1px solid var(--border);
+}
+table.data thead th{
+  background:var(--bg-inset);
+  font-size:.76rem; text-transform:uppercase; letter-spacing:.4px;
+  color:var(--text-soft);
+  position:sticky; top:0; z-index:1;
+  white-space:nowrap;
+}
+table.data tbody tr:last-child td{ border-bottom:0; }
+table.data tbody tr:nth-child(even){ background:var(--bg-sunken); }
+table.data td.num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+table.data td.mono{ font-family:var(--font-mono); white-space:nowrap; }
+
+.th-sort{
+  all:unset; cursor:pointer; display:inline-flex; align-items:center; gap:4px;
+  font:inherit; color:inherit; width:100%;
+}
+.th-sort:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.th-sort__arrow{ opacity:.35; font-size:.7rem; }
+th[aria-sort="ascending"] .th-sort__arrow,
+th[aria-sort="descending"] .th-sort__arrow{ opacity:1; }
+
+.table-foot{
+  display:flex; flex-wrap:wrap; gap:var(--space-3);
+  align-items:center; justify-content:space-between;
+  margin-top:var(--space-3);
+  font-size:.84rem; color:var(--text-soft);
+}
+.pager{ display:flex; gap:var(--space-2); align-items:center; }
+
+/* Tabla apilada en pantallas pequeñas (usa data-label de cada celda) */
+@media (max-width:640px){
+  table.data.stackable thead{ display:none; }
+  table.data.stackable, table.data.stackable tbody,
+  table.data.stackable tr, table.data.stackable td{ display:block; width:100%; }
+  table.data.stackable tr{
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    margin-bottom:var(--space-3);
+    padding:var(--space-2);
+    background:var(--bg-sunken);
+  }
+  table.data.stackable td{
+    border:0; padding:var(--space-2);
+    display:flex; gap:var(--space-3); justify-content:space-between; align-items:flex-start;
+  }
+  table.data.stackable td::before{
+    content:attr(data-label);
+    font-size:.72rem; font-weight:700; text-transform:uppercase;
+    letter-spacing:.4px; color:var(--text-faint);
+    flex:0 0 40%;
+  }
+  table.data.stackable td.num{ text-align:right; }
+  .table-scroll{ border:0; background:transparent; }
+}
+
+/* --- 1.12 Bloque de datos crudos (estructura inesperada) ----------------- */
+.raw{
+  margin-top:var(--space-4);
+  background:var(--bg-inset);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:var(--space-3);
+  font-family:var(--font-mono); font-size:.78rem;
+  white-space:pre-wrap; overflow-wrap:anywhere;
+  max-height:340px; overflow:auto;
+}
+details.raw-wrap{ margin-top:var(--space-4); }
+details.raw-wrap > summary{
+  cursor:pointer; font-size:.85rem; font-weight:600;
+  color:var(--text-soft); padding:var(--space-2) 0;
+  min-height:var(--tap); display:flex; align-items:center;
+}
+
+/* --- 1.13 Bloque de configuración y pie --------------------------------- */
+.config-card{ margin-bottom:var(--space-5); }
+.config-card > summary{
+  cursor:pointer; list-style:none;
+  padding:var(--space-3) var(--space-4);
+  background:var(--bg-elev);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  font-size:.9rem; font-weight:600;
+  display:flex; align-items:center; gap:var(--space-2);
+  min-height:var(--tap);
+}
+.config-card > summary::-webkit-details-marker{ display:none; }
+.config-card[open] > summary{ border-radius:var(--radius) var(--radius) 0 0; }
+.config-card__body{
+  border:1px solid var(--border); border-top:0;
+  border-radius:0 0 var(--radius) var(--radius);
+  padding:var(--space-4);
+  background:var(--bg-sunken);
+}
+
+.app-footer{
+  border-top:1px solid var(--border);
+  background:var(--bg-elev);
+  padding:var(--space-5) var(--space-4);
+  font-size:.83rem; color:var(--text-soft);
+}
+.app-footer__inner{ max-width:var(--maxw); margin:0 auto; display:grid; gap:var(--space-3); }
+
+/* Bloque de firma del pie: logo institucional completo y datos de contacto */
+.footer-firma{
+  display:flex; align-items:center; gap:var(--space-4);
+  flex-wrap:wrap;
+  padding-top:var(--space-3);
+  border-top:1px solid var(--border);
+}
+.footer-firma__logo{
+  width:auto; height:104px; flex:0 0 auto;
+  border-radius:10px;
+  background:#fff;
+  padding:4px;
+  border:1px solid var(--border);
+  object-fit:contain;
+}
+.app-footer strong{ color:var(--text); }
+.footer-note{
+  background:var(--warn-bg); color:var(--warn-fg);
+  border:1px solid var(--warn-bd);
+  border-radius:var(--radius); padding:var(--space-3);
+}
+
+/* --- 1.14 Barra de estado global ---------------------------------------- */
+.statusbar{
+  max-width:var(--maxw); margin:0 auto var(--space-4);
+  display:flex; flex-wrap:wrap; gap:var(--space-3);
+  align-items:center; justify-content:space-between;
+  font-size:.8rem; color:var(--text-faint);
+  padding:var(--space-2) var(--space-3);
+  background:var(--bg-elev);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+}
+.statusbar__item{ display:inline-flex; align-items:center; gap:var(--space-2); }
+.dot{ width:8px; height:8px; border-radius:50%; background:var(--ok-fg); flex:0 0 8px; }
+.dot--off{ background:var(--err-fg); }
+
+/* Aviso flotante de copiado */
+.toast{
+  position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(120%);
+  background:var(--brand-700); color:#fff;
+  padding:var(--space-3) var(--space-5);
+  border-radius:999px; font-size:.88rem; font-weight:600;
+  box-shadow:var(--shadow-2); z-index:200;
+  transition:transform .25s ease; pointer-events:none;
+}
+.toast[data-show="true"]{ transform:translateX(-50%) translateY(0); }
+
+@media print{
+  .nav-wrap,.header-tools,.actions,.table-tools,.config-card,.toast{ display:none !important; }
+  body{ background:#fff; }
+  .card{ break-inside:avoid; box-shadow:none; }
+}
+</style>
+</head>
+
+<body>
+<!-- == § 2 · MARCADO DE LA INTERFAZ ====================================== -->
+
+<a class="skip-link" href="#contenido">Saltar al contenido principal</a>
+
+<header class="app-header">
+  <div class="app-header__inner">
+    <div class="brand">
+      <img class="brand__logo" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAQDAwQDAwQEAwQFBAQFBgoHBgYGBg0JCggKDw0QEA8NDw4RExgUERIXEg4PFRwVFxkZGxsbEBQdHx0aHxgaGxr/2wBDAQQFBQYFBgwHBwwaEQ8RGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhr/wAARCACtAaQDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD7MHSnDr+FNHSlXqK7eh4SJB1pwpg608VLNEOFOHSminCkUh3elptOpMYq9afTF60+kUFOFNpw6UmUKOtLTRTqENAOtOptOoZSClHf6UlKO/0pDAUtIKWgAooooAKKKKACiiigAooooAKKKKACiiigAoNFIaAEooooAKQ0tIetNCYlIaWkPWmyWJTTTqwfGXim08EeFNY8RamC9tplq87IDgyMOFQe7MQPxpwi5yUVuxFHxz8SvC/w209bvxhqsVj5v+ogUGSefHXZGOT9eg9a8Uuv2z/CazFbLw3rtzEDxIzQx5/4DuNfIXifxPq3jvxFea/4luWutRvHy3PyxL/DGg/hRRwB/Wq0MGe1fb0Mjw8IL2zbf3I5J1rbH2Iv7ZfhxunhTWv+/wDD/jUg/bF8Ot/zK2s/9/4f8a+Rorb2q2lr7Vt/Y+CX2X97OV4mSPq//hsLw8f+ZW1n/v8Aw/400/tg+Hsf8itrP/f+H/GvlcWntSNa+1H9kYL+V/eyPrUj6lb9sTw6OvhXWf8Av/D/AI1C/wC2T4cXr4V1r/v/AA/418sSW3tVGa39qpZRgv5X97NFXbPtXwv+1T4B8RXcVpqMl74cnkYKjahGPJJPYyISF+rYHvXtausiK8bK6OoZWU5DA9CCOor8rp4QOD37HvX05+yZ8T7wahL4B1qdp7VoXn0hpGyYSvLwg/3SMsB2IOOteZmGUQo0nVoPbdG6lzH1maKDRXzAxwpw6iminDtSQ0PFPFMp4pFjh1pwpg608VJaFp1NpwpMYDqKkqOpKRQUopKUUMoWnU2nCkhoKdTaUUMpC0o7/SkpR3+lIYg606m06gAooooAKKKKACiiigAooooAKKKKACiiigApDS02gAooooAKbTjTaaEwpp606m0Mlga8X/aqZh8EtZCMV33dmrYPUecvH6V7Oa8Z/anGfgtq4/6fLP8A9HCu3Af71T/xL8zOfws+B7eHOK1beDOKr2sWcVs20PSv0uTPGqTHQW2ccVejtfap7eDNacNtkdKwlI4ZTMwWntTXteOlb4tOOlMktMA5FZ85n7Q5ma246V1nw5+DXiH4o3xTR4hZ6XC2LrU7hSIovUD++3+yPxIr1X4Q/AC48btFrPikS2Xh0HdFEPllvfp/dj/2up7etXvjv8X7WysH+H/w0EVjpFqht764tAEUgcGCPH8P95u5yPXPnVMdKpV+r4bWXV9I/wCbPVo0eSHta2i6LqzxT4mXvhbw/FN4Q+G0a3dlEwGqa5MqvNqMqnO1G6JCrDouNxHcDJxfgbvh+M3gtoyVJ1HafoUcEfka565hCjAGABxXUfBVMfGHwWf+okv/AKA1ehOmqeFnG99HdvroaRqc8rn6DHrRSHrRX50dI8UtNWnUhokpwpg6U8Uix1PHWmU70qS0OpR0pKUUDFp46CmU9elSULSjrSUUFDqUUlKKSAWlFJRTKHUo7/SkpR3+lSUJSikooAdRRRQAUUUUAFFFFABRRRQAUUUUAFQ295bXZnFpcQ3Bt5TDMI5A3lyAAlGx0YAjIPPIryD9pL42R/BjwK0+nPG/ijVt1vpETc7Gx887D+6gI+rFR618l/sb/F+78NfE+bw94gv5Z9N8XynfJPIWI1E8pKSe78oT3JX0r1qGWVq+FniFstvPv9w7H6MGkpT1rhfjD4wm8DfDvWNWsG2X5Vba0b+5LIdob/gIy34V5tOnKrNQju9CJSUU2zj/AIr/ALQul+A7ifR/D8Ca14gjGJQz4t7VvR2HLN/sjp3I6V6R4F8V23jjwlpWvWWFW8hBljB/1co4dPwYH8MV+crMzszyMzuxLMzHJYnkknuTX0X+yp46+w6vf+EL6XEGoA3Vhk8CdR86D/eUZ+qe9fTY3KqdDCc1PWUdW+/c82jipTq2lsz6vNJSnrXAfFPxnceFdLt7fSzs1C/LBJcZ8pFxuYe/IA/Ovm6VOVWahHdnbWqxoQdSWyO6W4hkmlhjljeaEDzI1YFkz0yO2cU6vnH4YeJn0bxfGb2Zmg1M+RcO7EkuTlXJP+1xn3NfRxGDg1tisO8NNRbuc2ExSxdPmSs0Ia8b/ajGfgxqw/6fLP8A9HCvZD1rxz9qL/kjOrf9fln/AOjRVYH/AHqn/iX5nTU+Bnw1ap0rbtU6Vj2lblp2r9IkfP1DXtYwcVtW0GccVl2lb1pjiuObPOqMnS0yucV7N8IPgsuvvDr/AIsg/wCJUpDWto4x9pPZ2H9z0H8X06nwd+GI8VzLrGtwkaLA/wC7jYf8fTjt/uDv6nj1r2b4n+PIPh74baaAI2ozgw2EBHG7H3iP7qjn8h3r5zG42cp/VqHxPr/X9I9bAYSKh9ZxHwrZd/P/AC7nnvx++K58O2L+FPC0wi1OaILdzRcfZYiOEXHR2H/fI9yK+PbmMKMAYFdRq11NfXU91eyvcXM7tJLK5yzuTkk1zl33r2sDhYYSnyR36vuYVsTLE1OZ7dEc/dJ1rpPgyuPi/wCDP+wkv/oLVz933rovg1/yV/wb/wBhJf8A0Fq76/8AAn6P8jejuj79opCaK/Nz0R606mLT6XUaHr0pwpi96eKRoPpw6U0UoqSkPFKKQdKXvQULTl602lHWpGh9FFFBSHUUgpakY6igUVRQ4Uo7/SminDv9KkpCUUUUAKKWm0oNAC0UUUAFFFFABRRRQAU2SWOCN5Z5FihjUvI7HAVQMkk+gHNOrwP9sH4gt4G+DV/aWUpi1LxHKNLgKnDLEwLTMP8AgAK/8DFb4ejLEVo0o7t2BHwj8e/inN8XviVqmuq7/wBlQn7JpMRPCWqE7TjsXOXPu2O1ebwXE1pPFcWkrQXELrJFIhwyOpyrA+oIBqMDAwOlFfrlKlCjTVOK0SsaH68fBn4iw/FX4baF4njKi6uIfKv41/5Z3SfLKvtkjcPZhWP+0Zo02sfCXV/sql3sZYbxlAzlEb5vyVifwr5R/YY+Jv8AYPjHUfA2pTbbHX1+0WO48LeRryo/34wfxRa+/p4IrqCWC6jWaCZGjljYZDqwwQfYgmvzTGUXluO0Wid16f1oY1Ic0XHufmPVzSNWu9B1Wx1TS5DFe2M6Twt6MpyPwPQ+xrf+JPguXwB401TQpAxt4ZPMs3b/AJaW78ofy4PuprlK+6jKNaCktU0fNtOErPdH6ReFfEdp4v8ADema7pp/0e/gWULnlG6Mh91YEfhXB/HDRpLrR7DVYQWFjIY5gOyPjB/76AH415j+yl458ubUfBt9J8sm690/cf4h/rUH1GG/Bq+mNS0+DVtPurC9Xdb3MTRSD2I6/h1/CvgqtN5fjLdE/wAGetOKxmGce/5nyDyOQSCOhHavqPwL4hHifwxZXzsDcqvk3I/6aLwT+PB/GvmjVtMn0XU7vTrwYntZTG3vjofoRg/jXf8AwZ8Rf2dr02kzvi31Jf3eegmUcfmMj8BXq4+kq9Dnj01+R83ltZ0MRyS2enzPea8c/ajOPgxq3/X5Z/8Ao4V7HXjX7U5x8FtWP/T5Z/8Ao4V4mB/3un/iX5n1tT4GfGHhOz0/VNcsLLW9T/sbT7iURzXpi8wQA9GK5HGcZOeASe1eheNfhN4n+HMgl1m0F1pT48nU7M+ZbuD0JPVCfRsexNeQW0lfWf7NnxsiWOHwF43lSaxmHlaXcXGGUZ4+zPnqp/hJ/wB30r7jHTr0F7WmuZLdfqjy4U6dR8k9G9n/AJnhdrKOK9U+EfgC5+IeuiFg8WkWhV764XjA7Rqf7zfoMn0r2D4gfsw6PrTyX3gedNAvmOWtnBa1c+wHMZ+mR7CvWvAvgyw8B+G7TRdKG5YhummYYaeU/edvc/oAB2rwMVm9KVC9H4n+H9dC6OVydb978K/E02bTvDOisxEVhpmnwZ4GFijUf4Cvin4h+Orjxz4judUn3R24/d2kJP8AqoQeB9T1PufavUv2l/iOEeLwbpc3OFn1NlPbrHEf/Qj/AMBr5sku8jrTyjBuEPbz3e3p/wAEzzTEe0l7GGy39f8AgEl1NnNYt1J1qee4z3rKuZuvNfTxieXCJSun610fwZbPxf8ABv8A2El/9BauRuZc5xXUfBV8/GHwYP8AqJL/AOgNTrr9xP0f5HoUlqj9BT1opKK/NjuHLUlRLUg6UikPXrTshQWYhVUEsScAD1J7CmL1GK+AP2ufjlqHifxbfeB/Dt9Jb+GtIk8i+ED7ft10Pv7yOqIflC9CQSc8Y78Fgp46t7OOnd9jaEeZ2Pum08a+GL6++wWXiXRbm+zj7PFqULSZ9NobOa3sFSQRg+hr8WBGoIIUAjkEDGK+6/2N/jpqHiZ5/AHjG9e9vbW3Nxo93O+6SSJPvwMx5YqMMpPOAw7CvUx+SSwtJ1acuZLfQ1lT5Vc+vhS0g60tfMkDqKQUtSNElFIvSuW+IXxH8OfC7w9LrnjO/FlaKdkMajdNcyY4jiTqzfoOpIFVCMpyUYq7ZSOrHWqmpatp2jIH1jULPTkPQ3VykIP/AH0RX50/FH9srxz41nntPB0h8G6ISVVbVg13Ivq838OfRMY9TXzxf3l1qty9zqlzPf3LnLTXMrSux92Yk19Rh+Ha1Rc1aXL5bs0UD9hLb4j+DLuUxW3i/wAPTS/3E1aAn8t1dLFIlxEs1vIk0LdJI2DKfxHFfiYYkPVF/Kuk8KeO/E/gW7W68Ha/qOizKc4tbhlRv95PusPYg101OG9P3dTXzRXKfsjT1/pXxn8FP22odUnt9E+MccFhPIQkOu26bIWY9PPjH3P99fl9QBzX2TDIksaSROskciBkdGDKykZBBHBBHevl8Xg62DnyVVb8n6CtYdRRRXEAUUVz3jbxzoHw68PXOveMNRj03TYONzcvK/aONBy7nsB9eBzVRjKclGKu2B0QOarahqdjpEYl1e+tdPjPRrqdYh+bEV+eHxV/bV8Y+LZ57L4fBvB+i5KrMmHvpR6tJ0j+icj+8a+bNU1K+1u6e71q9udSunOWmu52mcn/AHmJNfUYbh2vUXNWly+W7KsfsLF8SPBc83kweMfDsk39xdXgJ/LdXR288V5Cs9nNHcwN0kicOp/EcV+JflJ/cX8q3fDPjHxF4LvFu/COuajolwpzus7lowfqoO1h7EGuupw0re5U181/wQsfs3RXxH8F/wBuCSS4t9G+M0cYRyEj161i27T6zxLxj/bQcd1719r211Be20N1ZTxXNrPGskM0Th0kQjIZWHBBHcV8vi8FXwU+WqvR9GKxLX55/t4eLjq3xM0fw3C+bfQtNEki548+c7j+OxY/zr9C881+S/7Rd/PqXx18fzXZJkTV5YVz2SMBFH/fKivY4epKeLc39lf8AEeZUUUV+hll3RtYvfD2r6fq+jzG31DT7iO5tpR/DIjBlP5iv2B+Hnjay+I3gjQ/FOl4WDVLVZWjBz5UvSSM+6uGH4V+ONfaX7B3xN8m71n4eanN8k4bUtKDH+MACeMfUBXA/wBlq+Zz/Ce2w/to7w/LqJntH7UXgT+3PCsHiexj3X2ifLcYHL2rHn/vhsN9C1fHtfptd2sF9az2t7Es1tcRtFNG3R0YYIP1BNfnf8QfB8/gLxhqmg3G5ktpd1tIf+WkDcxt+XB9wa87JMTz03QlutV6Hi42naSmupl+Hteu/C+u6drWlttu7C4WePnhsHlT7EZB9jX6L6Drlp4l0PT9Z0t99nfwJPFz0DDlT7g5B9xX5rV9SfsqeOfOtNR8G30nz2+690/ceqE/vUH0JDf8CatM6w3tKKrR3j+X/AIwlTllyvqdb8bfDmyW01+2T5ZMW11j+8PuN+WR+AryW2uZbO4hubVzHPC6yRsOzA5Br6w17R4fEGjXumXXEdzEUDf3W6q34EA18oXdpNYXc9pdpsuLeRo5F9GBwa4ctre0peze6/I8nNKHsq3tI7S/M+rdA1mLxBotlqdvgLcxBmX+63Rl/AgivKP2rW2/BPVz/wBPtn/6OFSfBHxDte90G4bhs3Ntk9+jqP0P511fxk8GS/ED4Z+ItAsgGvp7cS2YPeeNg6D8Su38a82MFhMdHm2TT+Vz38NW+s0FLr19T82rebGK1YJ+Bz+Vc5G7xSNHOjRSxsUdHGGRgcEEdiDxWhDP05r9HaOacD7z/Zw+OY8YWkXhXxXc58QWsf8AolxI3N7Eo7nvIo6/3hz2Nez+O/F1n4F8J6nr+okGOziLJHnBlkPCIPcsQK/LrTtUuNPu7e7sLiS1u7eRZYZom2tG4OQwPYg1618T/j5qnxR8OeHtKv7cWjWOZdQaM/JdzgbVcL/CAMnHqx7AV8jickU8VGdP4G9fL09fwO6njJQpOMt1sctqmv3et6neanqkxmvbyZpp39WY5P4dh7AVSe696xRd+9Na696+lUElZHhcjbuzRmuves+e4z3qtJde9Uprj3rVRNYUxbifrzXW/BGTPxk8FD/qJr/6A1cDPPXs37Kvg+58RfEpNeaNv7N8PxtK8pHBuHUrGgPrgs30X3rHFyjTw1SUuzO6ELH3NRRRX5qaCipBUQ61ItJjRz3j/wAWReBPA/iHxLOQBpVjLOgP8UgGI1/Fyo/GvyJmuJrueW4u5DLcTO0krsclnY5Yn6kmvvX9uPxl/ZPgDRvC9vJtuNdvfOnUHn7PBg/kZGT/AL5NfA9feZBQ5MO6r+0/wX/Bud1FWVwrpvh14um8A+O/DviW3JB0u/jmkA/iiziRfxQsPxpNW8E6jo/gvw14ruR/xL9fmu4bfjoYGVTk++44/wB01zRGRg9DX0HuVoNbp3T/ACZtuftJFNFcRxz2ziSCZFkjcHhlYZB/EEVJXjP7LXjX/hN/gp4flnk8y+0gNpV1k5OYcBCfrGUP517MK/Jq1J0Ksqct07HK1YUUtJ3pawYjC8Z+MdJ+H/hbVPEniSfyNN06EySY+87dFjUd2ZiFA9TX5VfFf4qa58XvFtxr/iOQonKWNkrExWcGeI1Hr3ZurHn0A97/AG4fig+seKrLwFpkx/s/RVW61EKeJLt1yqn/AHEI/Fz6V8mV9/keAjRpKvNe9LbyX/BOiCsrhWroHhfXPFd2bTwvo2oa1cj70dlavMV+u0HH416z+zf8Arj41eIpp9VeWz8JaU6/2hcR8PO55FvGezEcs38I9yK/Svw14Z0bwbpEGkeFNMttH0yAYS3to9o+rHqzerHJNa5jnMMFL2cFzS/BDcrH5V3nwD+KOn2zXN14A8QLCoyxWyLkD6Lk/pXns0MttPJBcxSQTxNtkjkQqyH0IPINftcCQcg4NeRfHL4AeHvjRosxmhh03xTDGfsGromHDDpHLj78Z6HPK9R6HzcNxHzTUa8LLuunyEpn5V19h/sbftAXGl6rafDfxfdtLpl4SmhXErZNtN1+zkn+B/4fRuBw3HyZr2hah4Y1vUNF121ez1PT52t7mF+qOpwfqO4PcEGqUM0ttNHPaytDPE4kikQ4ZHByGB9QQDX02Lw1PHUHTls9n+TL3P2xoriPg/45/wCFk/DPwz4nfb9ov7NftYXoLhCUlH/fak/jXb1+UVISpzcJbrQgy/EniLTPCOgalr3iG5Wz0vToGnuZT/Co7AdyTgAdyQK/Kj41/GXWfjT4uk1fVS9rpduWj0vTt2UtYc9+xkbgs3c8dABX0R+3d8UZJb3Svhzpc5EEKpqOrhT95z/qYj7AZcj1ZPSvi6vushwEaVL6zNe9LbyX/B/IpIK0tD8Pav4mvRZeG9KvtYvP+eNlbPM49yFBx+Nel/s+fAy++N3ix7V5JLHw5pu2TVb1B8wUn5Yo88eY+Dj+6ASewP6deDvBmgfD/RIdG8G6Xb6Rp0Qx5cK4aQ/3nb7zse5Yk115lnFPAy9nFc0vwXr/AJDbPyvuP2fvipa2xuJvh/4gESjJK2ZYgf7oyf0rz26tbiwuZbW+t5rS6iO2SGaMxuh9CpwRX7Xg46V5l8Zvgd4a+NGhy22tW8dprcUZ+wavFGPOt37Bj1eP1Q/hg815OH4jbmlXhZd10Fc/Jivqr9kH9oG48H67aeAvFl2X8M6pN5enSyt/x4XLHhQT0jcnBHQMQeMmvm/xd4T1XwN4m1Pw74lt/suqabMYZ0zlT3DKe6sCGB7gisXnqCVI5BBwQfWvqcTh6WOoOEtU9n+TQ9z9tCCCQeCK/Nb9tHwDN4T+L8+uRRkab4ohF5E4HAnQBJk+uQrf8Dr7c/Z98fyfEv4ReG9dvZPM1IQmzv27tcQnYzH/AHgFb/gVYP7VHwzPxK+EeppYw+brWiE6np+BlmKKfNjH+9Hu49Qtfn+W1pZfjuWfflf9epK0Z+W1FICGAI6HkUtfphYVueDfFd/4F8V6N4l0Vtt9pV2lzGM8Pg/Mh9mXKn2NYdFTKKnFxlswP2e8NeIrDxd4e0rX9Fk83T9UtY7q3bvtcZwfccg+4NeJ/tS+Bf7W8OWniuxizd6QfKu9o5a2c8Mf9xz+TGvPP2EviZ/aOhat8P8AUps3Glk3+mBjybd2xKg/3XIb/tofSvry+sbfU7K5sdQiE9pdRNDNGejIwwR+Rr8wqRnleNa/lf3p/wDAOarTU4uLPzMra8I+Jrrwb4m0vXtPyZrCcSFM/wCsTo6H2ZSR+NT+OfCdx4G8WaroF5ljZzERSEf62I8xv+Kkfjmuer7tclan3TX4M+e1hLzR+lumana61plnqWmSCazvYUngcd0YZH868V+NPhz7FqtvrdumIb4eXPgdJVHB/Ff/AEE1mfsseOf7R0S98I30ubjTSbmyyeWt2PzKP91zn6P7V7b4s0BPE3h+9018CSVN0LH+GVeVP58fQmvg0nl+LcXsvyZ6OIprGYZpb7r1PmPRNWm0HV7LUrX/AFlrKHx/eHdfxGR+NfVtteQ39pb3VoweC4jWWNh3UjIr5FkjeGR45lKSRsVdT1VgcEfnXuPwZ8Q/btGn0ed8zWDb4snrCx/o2fzFd+Z0eeCqrp+R42VV+So6T6/mcj8ZP2YNI+I99ca94avE8P8AiOX5rgtGWtrtv7zqOVf1Zc57gnmvApP2S/idBMyR22jzop4kTU1AYeuCAfzFffI+634U09a5MPm2Kw8ORO6Xc+klFM+DU/ZV+J69bHSv/Bon+FTL+y38TR1stK/8Gaf4V91mm9jXT/bmK7L7v+CZujFnwx/wy98TP+fLSv8AwZp/hTT+y98TP+fLSv8AwZp/hX3PTTQs7xXZfd/wSPYxPhVv2W/iYellpX/g0T/Cq8n7LHxNbpY6V/4NE/wr7wPSo6pZ3iuy+5/5hyRR8WeGP2PfFWo3aN4y1Ww0WxDfOtpJ9pncei8BB9ST9K+sfCHg7RvAWgW2h+F7QWlhBk8nc8rn70jt/Ex7n8BgCuhNRmuDE4+vi9Kj07LYBM0Uh60VxWEKKetRisrxX4kt/B3hbWvEN6QINKspbps9yikqv4tgfjQouT5VuxrU/PL9rjxn/wAJb8aNVtoJN9loESaZDg5G9fmlP/fxmH/Aa8NWOSV1jgUvLIwVFHVmJwB+dTXt9capfXV/fuZLu7meeZz1Z3Ysx/MmvTv2bvCA8a/GnwrYzR+ZaWlx/aN0MceXAN+D9WCD8a/UoqOCwtukF+SPSS5Yn1d8fPhLHp/7LOm6PaRBrvwZbWt3kDkkDbcn8fMdj/u1+flfsrq+l2/iDS9Q0rUVD2uo20ttOD3SRSp/nX4867otz4b1zU9G1AFbrTbuW0mBH8UbFT/LNeJkGJdWFSEnqnf7/wDg/mZ0ne6Pqf8AYR8a/wBn+LfEPhC5kxDq1qL21Unjz4eHA9zG2f8AgFfeIr8hPhh4xk+H3xD8NeJoyQmm38ck4H8UJO2VfxRmr9eUkjlVZIHEkMih43HRlIyCPqMV4+f4f2eJVRbSX4r+kKorMfUN/qEGk6fd6hfNttbOCS4mJ7Iilm/QGpq8s/aS1ptB+BXjm6jYpJLp/wBlQj1mdYz+jmvApU/a1Iw7tL7yFqz8v/E/iG68W+JNX1/UWL3eq3kt3KSc4LsWx+AIH4VlojyuscKGSV2Cog6sxOAB9TSAYGBXpH7P/h5PFHxq8D6bOgkgbVI55VPQpCDKR/45X6zOUaFJy6RX5HVsj9Lvg98Prf4XfDjQfDVuii4t7cS3zgcy3TjdKx9fmOB7KBXcUrEsST1JzSV+RTnKpNzlu9TC9xRS00U6swPiD9u34YiG50j4h6Xb4E5XTtXKD+MDMEp+oDIT7JXxdX7L+LPCul+N/DWp+HfEdv8AatL1KAwzoDggdQynsykBgexAr5Bh/wCCfn/E8Bn8dh9BEmSqadi6Mf8Ad3btgbtuxjvjtX2uU5xRpYf2VeVnHbrdf8A1jI9U/YpiuI/gJp5uVcRyapetBu6GPeBke24N+tfQpkjiVpJ2CRICzsegUDJP5VmeHfD+m+E9B07Q/D9stnpenQLb20K87UX1Pcnkk9ySa5f4162/hz4QeOdThYrLBotyIyOzuhQH82FfL1p/W8U5RVuZ/myep+V/xH8XTePfH3iTxLcMWOqahLNHn+GLOI1/BAo/CuXY7QT1x6UKNqgegxXYfCnw6vi34neDtEkXfFfaxbRyjGcxiQM//joNfqj5aFLyivwRqfpp+zz8OIvhh8J9B0lohHqd1CL/AFNsctcSgMQf91dqD/dr1GlYgsSBgE8Ckr8hq1JVqjqS3buZhRRRWYHxv+3d8MBe6PpXxD0u3/0iwZbDVSi/egY/uZG/3XJTPo6+lfCdftJruh6f4m0XUNG122S80zULd7e5gfo6MMEex7g9iAa+Nbn/AIJ97tcJsvHQj0Iy5CS6cWulj/u7g2wt23YHrjtX2eUZvRoUPY4h25dvTsUmd1+wfFdJ8HtVe4BFtJr8xts9wIog5HtuH6GvqEHBz1+tYPg3whpPgHwxpnhvwzb/AGbS9Oi8uFScsxzlnY92ZiST6mt2vl8ZWWJxE6qVk2Jn5TftKfDP/hVvxZ1fTrSExaNqB/tHTMD5RDISSg/3H3L9APWvJK/SX9s74Y/8Jv8AC8+INOh8zWPCzNdDaMs9o2BOn4YV/wDgB9a/Nqv0XKcX9bwsW/iWj/rzKQUUUV7Azrvhd49uvhj4/wBC8VWO5v7PuAbiMH/W27fLKn4oT+OK/Xuw1G11bT7TUNMmW5sbyFJ7eVTkPG6hlYfUEV+K1foZ+xD8Tf8AhJvAV34N1KbfqXhpg1ruPL2UhO3H+4+V9gyV8nxDhOemsRHeOj9P+A/zIkb37U/gX+0tEs/F1hFm50zFvfbRy1ux+Vj/ALrnH0f2r5Nr9LtS0611jTrvTtSiE1neQvBPGf4kYYI/Wvzu8aeFrrwT4p1TQb/LSWUxVHI/1kZ5Rx9VIP51zZJivaU3RlvHb0/4B4uLp2lzrqSeBfFtx4G8W6Vr1plvskw86Mf8tIW4kT8VJ/HFfofZ3lvqFnb3ljKJrW5iWWGRejIwyp/I1+Z9fXn7L3jn+2fDFz4Yvpd17op322Ty1q54H/AWyPoy0s7w3PTVdbrR+n9fmGEqWfI+pF8YfDn9k+IV1K3TFrqYLtgcLMPvD8RhvzrmPBmvnwz4ksr8kiAN5dwB3ibhvy6/hX0F468PDxP4bu7JFBuUHnWxPaReg/EZH418vkHkMCD0IPb2rnwVRYnD+zl00+R4uPpPDYlVIddV6n2CCChKkMpwQR0I9aZXFfCvxD/bnhRIJ33XenEW8mTyU/gb8uP+A11Op6xp2iWrXOtahZ6bbAEmW7uEhXA68sQK+dnSlTqOD3R9PSqKtTU49S4aYa+e/Hf7Znw48KeZBoEt14wv1yAunrstwfeZ+CP90NXzJ47/AGy/iP4s82DQZrbwhYNwE05d8+Ped8kf8BC16uHyfGYjXl5V3en/AATdQbP0B8VeNPDngeyN54x1yw0SDGVN3OEZ/wDdT7zfgDXzZ47/AG5vDGlCW3+H+i3fiK5GQt1eZtbYH1C8yMPwWvhTUNQvNXvJL3Vru41C8kOXnuZmlkY+7MSarV9Lh8goU9arcn9y/wAy1SXU/Xn4e+L4fHvgTw94mtwijVbKOeREPEcuMSIM8/K4YfhXR18m/sMeOf7Q8La94Nu5MzaTcC+s1J/5YS8OB9JBn/tpX1lXyONw/wBVxE6fZ6enQ5ZrlbQ1qjNPY0w1xoyY0mimnrRVE3HLXzd+2t4y/sL4X2fh63k23PiK+VXUHn7PDh3/AAL+WPzr6QWvzs/bF8Zf8JN8YbjTIJN9p4dtUsVAPHnH95KfzYL/AMAr2Mooe3xkb7R1+7b8TeiuaSPn+vs79g7wj/yN3i6ePp5Wl2rEf9tJSP8AyEK+MCQASegr9Sf2bvCB8F/BfwtZTR+Xd3ludRugRg+ZOd4B+iFB+FfT55W9lhORbydv1Oqq7RsesV+b/wC2R4Q/4Rr4z3eowx7LXxDaR6ghA4Mo/dy/+PJn/gVfo+p4r5c/bl8If2r8O9G8SwR5n0LUPKmYDnyJxt/IOqf99V8tk1f2OMiuktP8vxMabtI+AiAQQeQa/Uf9l/xsfHHwV8Ozzy+bfaWjaXdknJ3Q4CE/WMoa/Lmvrr9g/wAa/YfFHiPwfcyYi1S2W/tVJ/5bQ/K4HuUbP/AK+pzzD+2wjkt46/5nRNXR93V4B+2fcNB8BNURTgTalZRt7jzN3/sor34V8/8A7aMRl+AuosoJEWqWTn2HmEf1r4nL/wDfKX+JfmYx3PzYr379jG0W5+Pmkuxx9n0+9lHHU+UV/wDZq8Br6E/YqkWP48WKswBk0q9VQe52A4/IGv0XMf8Ac6v+FnRLY/SkHIpaYp5p9flJzhSikooKHU5TyfpTaUd/pUgLXi37Wtz9l/Z78ZHn96ltDx/tXMde0A14p+1xbtcfs9+L9px5QtZT9FuY67sDb61Sv/MvzKR+XNezfsn2q3X7QfgoSDcIpp5QMd1t5CP1rxmvbP2RpRD+0L4Qzj5/tSc+9tJX6bjv90q/4X+Rqz9SKKbS59a/JbGdxaKM0UhhRRRmgAopM0lOwrjZoormGSC5jWaCVDHJG4yHQjBUj0IJFfkf8bPhxL8KfiZrnhoq32KKXz9Odv8AlpayfNGc98DKn3U1+uVfKv7cXwy/4SPwPZeNdNh3aj4cby7zaOXspGGSf9x8H2DNX0GR4v6tieR7T0+fT/L5jTPz3ooor9HNAr0P4H/EiT4U/E3RPEZZhYLJ9m1JF/jtZMLJx3xw490FeeUdetZ1Kca0HTls9AP2ujljmiSW3kWWGRQ8bqchlIyCD6Ec187ftT+BPt+k2Xi+wizPp+La/wBo5aBj8jn/AHWOPo/tU37HPxEm8b/CSLTdRkMmo+GZhpzuxyXg27oWP0XKf8Ar3nU9Mtda02803U4hNZXkLwTof4kYYNfl0XPLcZZ/Zevmv+Cjjq01OLiz8066n4c+MpfAPjPS9diLGCCTZdoP+WkDcSD8uR7gVm+KvD83hTxLq2h3TeZLp108Bf8AvgH5W/EYP41kV9+1CtTs9VJfgzwVeEvNH6Xw3EV1DFcWsiywTIskUinhlIyCPqCK+e/ir4c/sPxM9zbpts9SBnTA4WT+Nfz5/wCBV0P7M/iqfxB8P30+9LPLodx9ljkP8ULDcgz/ALOSPoBXY/FbTIdQ8F3s0uBLYlZ4m9DkKR+IP8q+Fo82CxjpPvb/ACOzG01icNzdVqeT/DDxD/YPimBJn22l+BbTZPAJPyN+DfzNe2+MPA/hzx7pTaV400a01mxDFljuEyY2xjcjD5kbHdSDXy/9CQexHavqLwfq0uueF9Lv7kETywgSEj7zKSpb8cZ/GunMYOEo1ouz2OLKazadJ9NUfIvxM/YWYedffCbWNw5YaTqr4P0jnA/Rx/wKvkrxZ4L8Q+BdUbTPGGjXmjXwyRHcx7Q4/vI33XHupIr9etc1rT/Dej32r65dJZabYQNcXM7nhEUZJ9z2A7kgV+VPxm+K2o/GDxzea/feZBYJ+40yzZsi2tgflGOm4/eY9yfQCvcyXG4zEtxqaxXXr6eZ9LCTZ59RRSEgdTivqzY9V/Zy8dD4ffGDw7qNxJ5en3kv9nXxzx5M2Fyf919jf8Br9SXBUlT1Bwa/GI57EqexHUV+rfwT8cj4i/Cvw1r8jh7yS1Fve+1xF8kmfqV3f8Cr43iHD2cK69H+n6nLXWzO9amGnGmNXyKORjaKKKogoa5rdt4a0PU9a1FgtpptpLdzE/3Y1LY/HGPxr8idY1e58QavqGr6ixe81C5kupif77sWP6mv0B/bI8Y/8I58JG0i3k2XfiK8S0wDz5CfvJfw4Rf+BV+eNfb5BQ5aMqr+07fJf8E7sPGybFUgMpZQ4BBKnofY+1fSEf7bnxIhjSOGw8NJHGoRFFhJhVAwAP3noK+bqK96thqOIt7WKdu50OKlufSg/bh+JY/5cvDX/gBJ/wDHaw/GX7W3jnx34W1Xw3r9h4fbTdTg8mbyrKRXUZBDKfMOGBAIOD0rweisI5dhItSVNXQuSK6BXX/Czxk/w9+I3hnxKpIj06+je4A/igb5ZR+KM1chSEAgg9DXbOCqQcJbPQtn7Tq6SKskLiSJwGRh0ZSMgj6ivJv2n9IbWvgJ42hQbnt7RLxQP+mUqOf0BqP9mPxt/wAJ18FvDl1PL5t9psZ0y7JOTvhwqk/WMofxr1DWtIg8RaJqej3gBt9RtJbSTP8AdkQqf51+VJPB4pKW8Jfkzk2Z+M1evfsuawuifHvwXLIwWO5uZLNif+msToP/AB4ivLNU0q50LVL7StQQx3dhcSW06ns6MVb9RS6RqtzoWrafqunttu9PuY7qA/7cbBh+or9QrQVejKC+0mvvR1PVH7PU8HIrG8LeJbLxl4a0jxDpDh7LVbSO6iIPQMMlT7g5U+4Na6nBr8iacW09zmH0UUUho434rfEO0+Ffw/1rxVfRrObKIC2ty2PPuHO2OPPoWIz7A1+eEf7XPxfTXP7UPigOvmbjYNZxfZSv9zZtzt7Z3bvfNe1/t7eO4ynhjwPZyhpAx1W/UH7owY4VP1zI35V8T195kuX0XhvaVYJuXddDaK0P14+EXxItPiz8P9J8U2MP2R7pWjurbdu8i4Q7ZEB7jPIPoRVX486O2v8AwV8eWEa75H0aeVFxnLRjzB/6BXmP7D1lLa/A4zS52Xet3csWf7oEafzQ19GXFtFe281rdKGguI2ilU90YEEfkTXyOIjHCY2ShtGWnyZnsz8UgdwBHQjNej/ALWk8P/GvwHfzNsiXWIYnbOMLLmM/+h1yXi/w3ceDvFeueHr1Ss+lX01o2e4RyAfxGD+NZMM8trNFcWrmOeF1kicfwupyD+YFfqU4qvRcVtJfmjY/bAgqSD1BxSVy/wAOPGlt8RPAmgeKLFgU1OzSWRQfuTAbZEPurhh+FdRX5DKLhJxlujIKKKKkDm/iB40sfh34L1vxRq4L2ul2rTeWDgyv0SMH1Ziq/jX5wXn7XXxdutdbVYvE/wBjjMm9NPitIvsqLn7m0qSR2yTn3r6F/b08dx2Phbw/4KtZR9r1O5/tC8QHlbeLIjB/3pCSP+udfBdfc5Jl9KWHdWrFNy2uuhcUfrX8DPivB8ZPh7ZeI0t0s79JGtdRtkOViuExnbnnawKsM9mx2r0evlX9gmzlh+FniK5kUiK519vKPrsgjB/U19VV8pj6UKGKnThsmS9wqrqemWmtaZe6ZqsK3NhfQPb3MTdHjdSrD8iatUhNcKdtRH48/EvwLefDTx5rvhXUdzPptyUikIx50J+aKQf7yFT9c1ylfdf7dnwy+3aPpPxB0yHM+nldP1QqOsDHMUh/3XJX/gY9K+FK/VcuxSxmGjU67P1X9XNU7oKKK634Y+A7z4m+PND8K6cWRtQuAs8oGfJgX5pZPwQH8cCu6c404ucnohn2z+wn4Qu9G+HOt+Ib1Gij1/UF+yKwxuhgUrv+hdnA/wB2vf8Ax94/0j4c6E+qa7JuZsra2iH95cyY+6o9PVugH4VJqeo6B8LfBIldFsNC0W0SC3gjHJVRtjjUd2PA+pJPevhTx5451T4h+Ip9Z1p8FvktrdTlLaLPCL/Mnuea/PaOHlm2KnXnpG//AAy+7c87EV/ZrTdmZ4i1268T69qWtalt+16hcNPKE+6pJ+6PYDA/Ct34efDXWviTq32PRYxDaQkfa76VT5Vup9f7zHso5PsOa3vhL8GdT+Jd4t1cGTTvDkL4mvNvzTEdY4gep9W6L7nivpTUPFmhfDvToPDHgGwiuLqH5I4IAXSNz1LkcyOe/f1I6V7WKxvsf3GHV5fgvU8tRjFe0quy/M29C0jwz8HPCUNjHP5FsrF3lk+aa7mI5bA6ngDA4AAFeceJPGGs/Em6GkeH7CVbEMG8lOWfHRpG6KB6dPrW1pXwz1jxRef2t4+vJYy/P2cMPNI/u+kY9hz9K9T0rSLHRLRbTSbWO0tx1VByx9SepPua+bdSlQlzt88+/Rf5luFfFrlfuQ7dX/keeeFvg5aWYW58USLfTjBFrGSIl/3j1b9B9a9NjiWNUigRURQFREGAB2AFSAEhgBknGK+Pv2p/2m49HgvfAnw4vg+qSAw6vqlu+RaqeGgiYf8ALQ9GYfdHA5zjOlTxGZVlBa/kkehQw1OiuWmrHAftffHpPGOqN4E8IXQk8P6bNnUrmJsre3KnhAR1jjP4FueiivlakAAAA4Apa/ScLhqeEoqlDZfj5nopWVgr7M/Y++BNlqOlXfjrxxpcF/a30b2mkWd5CJEeI8SzlW4OeUX6Me4rw79n74KXfxl8Yrb3CSQeGdOZZdXu14+XtCh/vvjHsMnsM/p5aWdtp1nb2WnQR2tnaxLDbwRLtWONRhVA9ABivAzvMPZx+r03q9/Jdvn+RhVnbRHzB8Sv2J/DOv8AnXvw4vm8L37ZYWc+6azc+g/jj/AsPap/2V/C3jT4Vaj4l8DePNJmtbS4I1LTLyI+bbSuuElVJBxkgxttOD8p4r6dpjE4IB4r5mWY16lB0Kj5k++6+Zzubasxhphp5ph6156MGJRSE0UxH59/tn+Mf7f+KkOh28m618O2SwMAePtEuJJPxAMY/CvnKtXxP4guPFfiTWNdvmLXGqXst0+e29iQPwBA/CqNjYXGq31rYWKGS6vJkghUd3dgqj8yK/VMLSWGw8afZf8ADnqwXLFI+4/2Vvgj4V1X4VQa7428NadrV9rF5LNbvfW4kMdup8tQuegJV2/EV7ePgR8L/wDon/h3/wAAVrqPDHh+38JeGtH0GxAFvpVlFaJjvsUAn8SCfxrYU1+b4nGVqtaU1JpN92cDm227nA/8KH+F/wD0T/w7/wCAK05fgP8AC7H/ACT/AMO/+AK139KDzWH1iv8Azv72NSfc+F/2zfhFoXgy08L+IfBWiWei2Mskthew2cIjQyY3xuQO5AcZ9hXyVX6o/tEeCz48+DninTII/Nvbe2+32YAyfNg+cAfVQy/8Cr8rQQwBHQjNfdZHiXXwvLJ3cXb9Tspu6Pr39g/xr9i8R+JfB1zJiLUrddQtFJ/5axfLIB7lGB/4BX3WODX5J/BbxS/gz4seD9aRiqQanFHPz1ilPluP++XNfrYy7WZT1U4r53P6Hs8Upr7S/Faf5EVFZn51/tpfDh/CnxMXxNZQldL8UJ5zMBwl2gAlX/gQ2v77m9K+bK/W34v/AAxsPi74D1Hw1qDLBcPiawumXP2a5XOx/pyVYd1Y1+U3iTw5qnhDXtQ0LxHaPY6pp8xhuIX7MO4PdSOQRwQQa+hyXGrEUFSk/ej+XR/oaQldWPpr9kn9oqz8DZ8D+PLsWugXMxk0y/lPyWUrH5o3PaNjyD0Vic8HI++0dZI0kjZZI5FDI6kFWU9CCOCPevxW616B4H+N/wAQfhzbra+EfFF7Z2Cn5bKXbPAPpHICF/DFc+Y5IsVUdWi7N7p7MJQvqj9bVOeK4b4rfFrw78H/AA3Lq/ii5U3DKRY6ejDz7yTHCoOy56ueFH4A/n9qH7YHxfv7cwjxHbWWRgyWumwRv+DbTj8K8d1zXtV8TanLqfiPUrvVtRm/1lzdzNK59sk8D2HFefhuHanOnXkrdl1JUO5e8beMdU+IHivVfEviKUS6jqU5lkC/djXosa+iqoCj2FYcUMtxLHDbRtNPKwSONRkuxOAAPUkgUyvq79jL4IS+KPEUfxA8R22NC0eU/wBmJIvF3eL/ABgd0j657vgfwmvq8TXpYHDub0SWi/JGr0Ps/wCEvgsfDr4a+GPDDACfTrFFuSOhnbLyn/vtm/KuzptKDX5RUlKpNzlu9TA/P/8Abm+Gz6H410/xvYQkWGvxi3vGUcJeRLgE/wC/GAfqjV8oV+wfxM+H2mfFHwTqvhfXPkgvY8wzhctbzrzHKvurdu4yO9fk3418Gaz8PvE+o+HPFFqbXUrGTa4/hkX+GRD3RhyD/Wv0DIscq9D2Mn70fxXT7tjWLue9/snftEW3wvv5vCvjScx+FNTn82G6bJGn3BwCxH/PN8Dd/dIB9a/RS3uIby3hubOaO5tpkDxTROHSRT0ZWHBHuK/FGu58DfGXx58No/J8F+J77TbTO42hImt8+vlOCo/ACpzLJVi5urRdpPe+zG1c/XmuQ+JPxM8O/Cjw3Nrvi+9W3hAItrZSDPdyY4jiXuT69B1JAr887z9sf4w3lu0K+IrS1LDHmW+lwK4+hKnFePeI/FGt+L9TfU/FWrXus6g4wZ7ycyMB6DP3R7DArzMPw7Vc068kl5biUTW+JfxB1T4peNdU8Ua+QtxeviKBWylvCvEcS+yjv3OT3rk+ewJPYAcmivpT9kP4Hy/EDxfF4t1+2P8Awi2gTh03r8t5eLykY9VQ4Zv+Ajua+trVaWBw7k9IxWi/JFPRH2p8AfAknw3+EPhjQryPytQFv9qvlPUXEx8x1Puu4L/wGvSc0EkkknJNJX5RVqyq1JTlu3cxuB5ooorIRleJvDlh4v8ADuq6Brcfm6fqlrJbTjHIVhjcPcHBHuBX4/8AjHwrf+BvFeseG9aXbfaVdPbSnGA+D8rj2ZcMPYiv2UJr4h/bt+GXl3Gj/ETTIfll26bqxUfxAEwSH6jchPslfT5Bi/Y13RltL8/+D/kXFnxdX3P+wd8ORbaVrnj2+h/f3znTNNJHIiQgzMPq+1f+AGviHTtOutY1Gz07TIjPe3s6W9vGBy0jsFUfmRX6feMLu2+AXwN07QtEkVL6CzTS7Jx1adlJlm/Mu/1Ir387qydOOGp/FN/h/X6hVmoRbZ4r+0T8Sj4x8UnRdMm3aHosjICp+We56PJ7heVH0J71Z+DPwHuPGpg13xYktn4cBDQw8rJffTusf+11Pb1rovgr+z216LbxH8QrZktOJLPS5Rhpe4kmHZe4Tqe/HB+o1X5QEXCKAAFGAoHQY7V4WKx8MJSWGwr23f8Al5+Z5dOi6kvaVDz690/xDrf/ABI9Csx4R8OWoEHm7QJJEH8MaKflX8fqe1dD4Z8GaP4Uixpdtm4Iw9zL80rfj2HsMV0ARm6KT9BWZrniHR/DFq114k1aw0e2UZMl7cpCP/HiM/hXgOrOa5I6Lsuvr3No0IqfO9X59PTsaJqtqGoWmk2Fxf6rdQWNjbIZJ7i4kEccajuzHgCvm74iftseCPDKS23giCfxhqQyFkQGC0U+pkYbn/4CvPrXxl8T/jZ4z+Lt3v8AF+qE2CPug0y1BitYfcJn5j/tMSfevYweS4nENOa5Y+e/3f5nWoNnv3x//bDk1uG88MfCKaW106QGK71zBSWdehWAHlFP984Y9sdT8f8ASiivusLhKODp8lJf5v1N0kgru/hN8Jte+MHiiPRvDsflW8eHv7+RSYrOLP3m9WP8K9WPtkjqfgl+zn4m+MV1HeBX0Xwqj4n1WaP/AFgHVIFP+sb3+6O57V+jHgTwFoHw28O2+g+ELFbKxi+Z2PzSTyY5kkfqzH17dAAOK8vMs2hhU6dLWf5ev+RnOoo6IZ4A8BaJ8MvCll4c8LW5hsrYZeR8GS4lP3pZD3Y/oMAcCujpzHnFNr4CUpTblJ3bONsQ1GaexqM9alGbEY0ylakNWSxpopMZooEfkT4t8J6n4F8R6j4d8QW7W+oafKYnUjh1H3XX1Vhgg+hr2T9kP4fyeL/irbazcQltK8NL9tlcj5TcHIhT67sv9Er7o8YfDTwh8QfIPjTw9Y6zJANsMsyESIP7odSGx7ZxWt4a8K6H4N0tdL8KaTaaPp6sX8i1j2AserE9WPuSTX1VfPPa4Z01G0mrN9PM6nXvG1tTaFOU0xaeOtfJswRIKWmg9KdSKRIpBxuUMO4PQj0r8pvjr8OZ/hf8Tdb0VoWj06WZrvS5CPlktZCWXB77clD7rX6rr1Irn/F/gLwx4/sYrLxpoVlrdvCxaIXMeWiJ6lHGGXPfBGa9XLcf9QquTV4vc2py5Wfl98F/AGo/En4k6DoulxO0S3UdzfTAfLb20bBndj24GB6kgV+tLNukZsYBJOK5rwh4D8MeALKSy8F6FZaJbysGlFtHhpSOhdzlmx7k4ro6WZ4/6/UTSslsVKXMx44ryD46fs96D8a9PSaaQaR4ntI9lnqiR7sr1EUy/wAaZ6d1zx3B9dHSnCvOo1qlCanTdmgTsfkv8Rvgp43+Fl1JH4t0OdLMMRHqNspmtJR6iQDA+jYPtXn4YMMqQR7Gv2pYB42RwGRhhlYZDD0I71wus/BT4ceI5mm1nwNoNzOxy0i2SxMfqUxmvq6PEdlatDXuv8n/AJmqqdz8kaktrea9uY7WyhlurmQ7Y4YULu59Ao5NfqdF+zJ8IYZA6eA9MJHZ5JnH5F8V3XhvwR4Z8HJs8J+HtK0TjBazs0iY/VgNx/Ot58R0Uvcptvzsv8x+0Ph/4KfsY654nuLfWPitHN4f0IEOum7tt5dD0b/nih75+f0A6198aVpllomnWum6PaQ2Gn2cIht7eBAqRIBgKB6VYU808d/pXyuMx9bHT5qj06LoiHJtiUUUV54Cg15b8bfgT4e+NuixwaqTp2uWikafqsSBpIc87HH8cZPVc8dQQevqNFaUqs6M1Om7NBsfk58TPgJ47+FNzL/wkejS3GmKxEeq2Kma1cdiWAyh9nANeZqyt90g/Q1+2GTgjqCMEHoR71xGu/Bn4d+JpWm13wToN3Oxy0v2FI3P1ZACa+tocRtK1aF33X+X/BNFM/IenQxvcTJBbo808h2pHGpZmPoAOSa/VRP2YPhBHIJF8B6aWBzhpJmH5F8V2/hn4feE/BgH/CJeGdI0V8Y8y0s0R/8AvvG79a6J8SUUvcptvzsv8x858H/Bb9jjxL41uLbVfiNFceF/DmQ/2ZxtvbtfRUP+qU/3m59F71+gWg6DpnhfRrLRvD1lDp2l2MQitraEYVFH8yTySeSSSa0ScnJor5XG5hXx0r1HotktjNu4UUUhNecIWkzSUU7AFc7488G2PxC8G634X1cAWuqWrQ7yM+U/VJB7q4VvwroqKuMnCSlHdBex+d37JHwsuZfjzqK+JrYxzeCFlkniYcC7DmKP8jucf7oNfdmr+BtK8QeJtM13XFa/k0qIrY2suDBDIxy0xX+J+FAzwMdM81e07wto2ka3rGt6Zp0Frq2tGI6jdIDuuPLXam7nHAJ6AZ75rVY9q9LG4+eLre1WmiX+f6/IUrS3BmLHk5rjviH4BTx9pC2sGu6x4a1KAlrPUtKvHhkib/aVSFkQ4GVb8CDXX0V50JypyUo7oV7H5xfFvwj+0D8PvOfxF4k8T63oSEhNT07U55YSvq6qd0Z9mGPc187Xd7NqNwZtQuZby47vPKZH/NiTX7TbivQ4zwa5jX/hx4O8Vq3/AAkvhXRNUZur3FhGX/76xu/WvqsLnypq1SkvVafh/wAEtVLdD8fKRmVfvED6mv1Rf9mT4QvIZT4D0wNnOFkmC/kHxXRaF8IPh/4YkEug+CtBs5l5EosUdx/wJgTXfLiKgl7sH+H/AASvaI/MjwL8GfHfxIlQeEvDd7c2zEBr2ZPItkHqZXwv5ZPtX1/8KP2KdA8NPBqfxNuo/E+ophl0+EFbKNv9rOGl/Havsa+rAT5e3+FcADsB7Uw14uKzvE4hcsPdXlv9/wDlYylUbIooYraCKC2jSCCJQkccaBVRR0VVHAA9BTqU9aa3SvBMRtIaDSGmyGMJpppTTWpksaaaxpaaaogbRRRVEn//2Q=="
+           alt="ACC Contadores" width="420" height="173">
+      <div class="brand__text">
+        <h1 class="brand__title">Verificador Hacienda CR</h1>
+        <p class="brand__sub">Consultas a las API públicas del Ministerio de Hacienda de Costa Rica</p>
+        <p class="brand__firm">Una herramienta de <strong>ACC Contadores</strong> · Asesoría y Consultoría Contable</p>
+      </div>
+    </div>
+    <div class="header-tools">
+      <button type="button" class="tool-btn" id="btn-theme" aria-live="polite">
+        <span aria-hidden="true" id="theme-ico">🌓</span>
+        <span id="theme-label">Tema automático</span>
+      </button>
+      <button type="button" class="tool-btn" id="btn-clear-cache">
+        <span aria-hidden="true">🧹</span>
+        <span>Limpiar caché</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<nav class="nav-wrap" aria-label="Módulos de consulta">
+  <div class="tablist" role="tablist" aria-label="Seleccione el tipo de consulta">
+    <button class="tab" role="tab" id="tab-tributaria" aria-controls="panel-tributaria" aria-selected="true" tabindex="0" data-panel="tributaria">
+      <span class="tab__ico" aria-hidden="true">🏛️</span> Situación tributaria
+    </button>
+    <button class="tab" role="tab" id="tab-cambio" aria-controls="panel-cambio" aria-selected="false" tabindex="-1" data-panel="cambio">
+      <span class="tab__ico" aria-hidden="true">💱</span> Tipo de cambio
+    </button>
+    <button class="tab" role="tab" id="tab-exoneracion" aria-controls="panel-exoneracion" aria-selected="false" tabindex="-1" data-panel="exoneracion">
+      <span class="tab__ico" aria-hidden="true">📄</span> Exoneraciones
+    </button>
+    <button class="tab" role="tab" id="tab-agro" aria-controls="panel-agro" aria-selected="false" tabindex="-1" data-panel="agro">
+      <span class="tab__ico" aria-hidden="true">🌾</span> Agropecuario (MAG)
+    </button>
+    <button class="tab" role="tab" id="tab-pesca" aria-controls="panel-pesca" aria-selected="false" tabindex="-1" data-panel="pesca">
+      <span class="tab__ico" aria-hidden="true">🐟</span> Pesca (INCOPESCA)
+    </button>
+    <button class="tab" role="tab" id="tab-cabys" aria-controls="panel-cabys" aria-selected="false" tabindex="-1" data-panel="cabys">
+      <span class="tab__ico" aria-hidden="true">📦</span> CABYS
+    </button>
+  </div>
+</nav>
+
+<main id="contenido">
+
+  <!-- Barra de estado: conexión, última consulta y tamaño de caché --------- -->
+  <div class="statusbar">
+    <span class="statusbar__item">
+      <span class="dot" id="net-dot" aria-hidden="true"></span>
+      <span id="net-text">Conexión disponible</span>
+    </span>
+    <span class="statusbar__item">
+      🕓 Última consulta: <strong id="last-query">—</strong>
+    </span>
+    <span class="statusbar__item">
+      💾 Consultas en caché temporal: <strong id="cache-count">0</strong>
+    </span>
+  </div>
+
+  <!-- Configuración opcional ---------------------------------------------- -->
+  <details class="config-card">
+    <summary><span aria-hidden="true">⚙️</span> Configuración avanzada (opcional)</summary>
+    <div class="config-card__body">
+      <div class="form-grid">
+        <div class="field field--wide">
+          <label for="cfg-proxy">URL de su propio proxy (opcional)</label>
+          <input type="url" class="input input--mono" id="cfg-proxy" placeholder="https://mi-proxy.midominio.workers.dev" autocomplete="off" spellcheck="false">
+          <p class="hint">
+            Déjelo vacío para consultar directamente a <code>api.hacienda.go.cr</code> (modo recomendado).
+            Un proxy propio sólo es útil para recibir los códigos <strong>400</strong> y <strong>404</strong> exactos,
+            porque esas respuestas de error del Ministerio no incluyen cabeceras CORS.
+            En la carpeta <code>proxy/</code> del proyecto se incluye el código listo para publicar.
+            <strong>Use únicamente un proxy que usted mismo haya desplegado.</strong>
+          </p>
+        </div>
+        <div class="field">
+          <label for="cfg-ttl">Duración de la caché temporal</label>
+          <select class="select" id="cfg-ttl">
+            <option value="0">Sin caché</option>
+            <option value="300000">5 minutos</option>
+            <option value="600000" selected>10 minutos (recomendado)</option>
+            <option value="1800000">30 minutos</option>
+          </select>
+          <p class="hint">Evita repetir consultas idénticas y reduce el riesgo de bloqueo por límite de tasa.</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn--primary" id="cfg-save">Guardar configuración</button>
+        <button type="button" class="btn" id="cfg-reset">Restablecer</button>
+      </div>
+      <div id="cfg-alert" role="status" aria-live="polite"></div>
+    </div>
+  </details>
+
+  <!-- ==== MÓDULO 1: SITUACIÓN TRIBUTARIA ================================= -->
+  <section class="panel" id="panel-tributaria" role="tabpanel" aria-labelledby="tab-tributaria" tabindex="0">
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">🏛️</span> Situación tributaria del contribuyente</h2>
+        <p class="card__desc">
+          Consulte el nombre, el tipo de identificación, el régimen, la situación tributaria y las
+          actividades económicas inscritas ante la Dirección General de Tributación.
+        </p>
+        <code class="card__endpoint">GET https://api.hacienda.go.cr/fe/ae?identificacion={numero}</code>
+      </div>
+      <div class="card__body">
+        <form id="form-tributaria" novalidate>
+          <div class="form-grid">
+            <div class="field">
+              <label for="in-tributaria">Número de identificación</label>
+              <input class="input input--mono" type="text" id="in-tributaria"
+                     inputmode="numeric" autocomplete="off" spellcheck="false"
+                     maxlength="12" placeholder="Ej.: 3101012386"
+                     aria-describedby="hint-tributaria err-tributaria">
+              <p class="hint" id="hint-tributaria">
+                Solo números, entre 9 y 12 dígitos y <strong>sin ceros al inicio</strong>: el servicio
+                oficial los rechaza. Cédula física sin guiones (110100123), cédula jurídica de 10 dígitos
+                (3101012386), DIMEX de 11 o 12 dígitos.
+              </p>
+              <p class="field-error" id="err-tributaria" role="alert"></p>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" id="btn-tributaria">
+              <span aria-hidden="true">🔍</span> Consultar
+            </button>
+            <button type="button" class="btn" data-clear="tributaria">Limpiar</button>
+            <button type="button" class="btn btn--ghost" data-new="tributaria">Nueva consulta</button>
+          </div>
+        </form>
+        <div class="loader" id="load-tributaria" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Consultando el servicio del Ministerio de Hacienda…</span>
+        </div>
+        <div id="alert-tributaria" role="status" aria-live="polite"></div>
+        <div class="result" id="out-tributaria" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== MÓDULO 2: TIPO DE CAMBIO ======================================= -->
+  <section class="panel" id="panel-cambio" role="tabpanel" aria-labelledby="tab-cambio" tabindex="0" hidden>
+
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">💵</span> Tipo de cambio del dólar — vigente</h2>
+        <p class="card__desc">Tipo de cambio de compra y de venta publicado para el día en curso.</p>
+        <code class="card__endpoint">GET https://api.hacienda.go.cr/indicadores/tc/dolar</code>
+      </div>
+      <div class="card__body">
+        <div class="actions" style="margin-top:0;padding-top:0;border-top:0">
+          <button type="button" class="btn btn--primary" id="btn-tc-actual">
+            <span aria-hidden="true">🔄</span> Consultar tipo de cambio actual
+          </button>
+          <button type="button" class="btn" data-clear="tcactual">Limpiar</button>
+        </div>
+        <div class="loader" id="load-tcactual" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Consultando el tipo de cambio…</span>
+        </div>
+        <div id="alert-tcactual" role="status" aria-live="polite"></div>
+        <div class="result" id="out-tcactual" aria-live="polite"></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ==== MÓDULO 3: EXONERACIONES ======================================== -->
+  <section class="panel" id="panel-exoneracion" role="tabpanel" aria-labelledby="tab-exoneracion" tabindex="0" hidden>
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">📄</span> Consulta de autorización de exoneración</h2>
+        <p class="card__desc">
+          Consulte los datos de una autorización de exoneración emitida por el Ministerio de Hacienda.
+        </p>
+        <code class="card__endpoint">GET https://api.hacienda.go.cr/fe/ex?autorizacion=AL-XXXXXXXX-XX</code>
+      </div>
+      <div class="card__body">
+        <form id="form-exoneracion" novalidate>
+          <div class="form-grid">
+            <div class="field">
+              <label for="in-exoneracion">Número de autorización</label>
+              <input class="input input--mono" type="text" id="in-exoneracion"
+                     autocomplete="off" spellcheck="false" maxlength="14"
+                     placeholder="AL-00460853-20"
+                     aria-describedby="hint-exoneracion err-exoneracion">
+              <p class="hint" id="hint-exoneracion">
+                Formato <code>AL-XXXXXXXX-XX</code>. Puede escribir solo los 10 dígitos
+                (por ejemplo <code>0046085320</code>) y la aplicación lo convertirá automáticamente.
+              </p>
+              <p class="field-error" id="err-exoneracion" role="alert"></p>
+            </div>
+            <div class="field">
+              <span class="dl__k">Formato que se enviará</span>
+              <output class="input input--mono" id="preview-exoneracion" style="display:flex;align-items:center;background:var(--bg-inset)">—</output>
+              <p class="hint">Se normaliza a mayúsculas y se valida antes de enviar.</p>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" id="btn-exoneracion">
+              <span aria-hidden="true">🔍</span> Consultar
+            </button>
+            <button type="button" class="btn" data-clear="exoneracion">Limpiar</button>
+            <button type="button" class="btn btn--ghost" data-new="exoneracion">Nueva consulta</button>
+          </div>
+        </form>
+        <div class="loader" id="load-exoneracion" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Consultando la autorización…</span>
+        </div>
+        <div id="alert-exoneracion" role="status" aria-live="polite"></div>
+        <div class="result" id="out-exoneracion" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== MÓDULO 4: AGROPECUARIO ========================================= -->
+  <section class="panel" id="panel-agro" role="tabpanel" aria-labelledby="tab-agro" tabindex="0" hidden>
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">🌾</span> Registro de productores agropecuarios (MAG)</h2>
+        <p class="card__desc">
+          Verifique si una persona física o jurídica figura en el registro de productores agropecuarios
+          del Ministerio de Agricultura y Ganadería, según la información publicada por Hacienda.
+        </p>
+        <code class="card__endpoint">GET https://api.hacienda.go.cr/fe/agropecuario?identificacion={numero}</code>
+      </div>
+      <div class="card__body">
+        <form id="form-agro" novalidate>
+          <div class="form-grid">
+            <div class="field">
+              <label for="in-agro">Número de identificación</label>
+              <input class="input input--mono" type="text" id="in-agro"
+                     inputmode="numeric" autocomplete="off" spellcheck="false"
+                     maxlength="12" placeholder="Ej.: 2100042005"
+                     aria-describedby="hint-agro err-agro">
+              <p class="hint" id="hint-agro">
+                Solo números, entre 9 y 12 dígitos y <strong>sin ceros al inicio</strong>.
+                Para personas jurídicas, use los primeros 10 dígitos de la cédula.
+              </p>
+              <p class="field-error" id="err-agro" role="alert"></p>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" id="btn-agro">
+              <span aria-hidden="true">🔍</span> Consultar
+            </button>
+            <button type="button" class="btn" data-clear="agro">Limpiar</button>
+            <button type="button" class="btn btn--ghost" data-new="agro">Nueva consulta</button>
+          </div>
+        </form>
+        <div class="loader" id="load-agro" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Consultando el registro agropecuario…</span>
+        </div>
+        <div id="alert-agro" role="status" aria-live="polite"></div>
+        <div class="result" id="out-agro" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== MÓDULO 5: PESCA ================================================ -->
+  <section class="panel" id="panel-pesca" role="tabpanel" aria-labelledby="tab-pesca" tabindex="0" hidden>
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">🐟</span> Productores y actividades pesqueras</h2>
+        <p class="card__desc">
+          Consulte información de productores, personas registradas ante el INCOPESCA y acuicultores
+          vinculados con actividades pesqueras.
+        </p>
+        <code class="card__endpoint">GET https://api.hacienda.go.cr/fe/pesca?identificacion={numero}</code>
+      </div>
+      <div class="card__body">
+        <form id="form-pesca" novalidate>
+          <div class="form-grid">
+            <div class="field">
+              <label for="in-pesca">Número de identificación</label>
+              <input class="input input--mono" type="text" id="in-pesca"
+                     inputmode="numeric" autocomplete="off" spellcheck="false"
+                     maxlength="12" placeholder="Ej.: 2100042005"
+                     aria-describedby="hint-pesca err-pesca">
+              <p class="hint" id="hint-pesca">
+                Solo números, entre 9 y 12 dígitos y <strong>sin ceros al inicio</strong>.
+                Para personas jurídicas, use los primeros 10 dígitos de la cédula.
+              </p>
+              <p class="field-error" id="err-pesca" role="alert"></p>
+            </div>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" id="btn-pesca">
+              <span aria-hidden="true">🔍</span> Consultar
+            </button>
+            <button type="button" class="btn" data-clear="pesca">Limpiar</button>
+            <button type="button" class="btn btn--ghost" data-new="pesca">Nueva consulta</button>
+          </div>
+        </form>
+        <div class="loader" id="load-pesca" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Consultando el registro pesquero…</span>
+        </div>
+        <div id="alert-pesca" role="status" aria-live="polite"></div>
+        <div class="result" id="out-pesca" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==== MÓDULO 6: CABYS =============================================== -->
+  <section class="panel" id="panel-cabys" role="tabpanel" aria-labelledby="tab-cabys" tabindex="0" hidden>
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">📦</span> Catálogo de Bienes y Servicios (CABYS)</h2>
+        <p class="card__desc">
+          Busque un bien o servicio por su código CABYS de 13 dígitos, o por una descripción de al
+          menos tres caracteres.
+        </p>
+        <code class="card__endpoint">GET .../fe/cabys?codigo={codigo}  ·  GET .../fe/cabys?q={descripcion}&amp;top={cantidad}</code>
+      </div>
+      <div class="card__body">
+        <form id="form-cabys" novalidate>
+          <fieldset style="border:0;padding:0;margin:0 0 var(--space-4)">
+            <legend class="dl__k" style="margin-bottom:var(--space-2)">Modalidad de búsqueda</legend>
+            <div style="display:flex;gap:var(--space-4);flex-wrap:wrap">
+              <label style="display:inline-flex;align-items:center;gap:var(--space-2);font-weight:600;min-height:var(--tap);cursor:pointer">
+                <input type="radio" name="cabys-modo" value="codigo" checked> Por código
+              </label>
+              <label style="display:inline-flex;align-items:center;gap:var(--space-2);font-weight:600;min-height:var(--tap);cursor:pointer">
+                <input type="radio" name="cabys-modo" value="descripcion"> Por descripción
+              </label>
+            </div>
+          </fieldset>
+
+          <div class="form-grid">
+            <div class="field" id="wrap-cabys-codigo">
+              <label for="in-cabys-codigo">Código CABYS</label>
+              <input class="input input--mono" type="text" id="in-cabys-codigo"
+                     inputmode="numeric" autocomplete="off" spellcheck="false"
+                     maxlength="13" placeholder="2132100000100"
+                     aria-describedby="hint-cabys-codigo err-cabys">
+              <p class="hint" id="hint-cabys-codigo">Exactamente 13 dígitos.</p>
+            </div>
+
+            <div class="field" id="wrap-cabys-q" hidden>
+              <label for="in-cabys-q">Descripción del bien o servicio</label>
+              <input class="input" type="text" id="in-cabys-q"
+                     autocomplete="off" maxlength="80" placeholder="Ej.: jugo de tomate"
+                     aria-describedby="hint-cabys-q err-cabys">
+              <p class="hint" id="hint-cabys-q">Mínimo 3 caracteres.</p>
+            </div>
+
+            <div class="field" id="wrap-cabys-top" hidden>
+              <label for="in-cabys-top">Máximo de resultados</label>
+              <select class="select" id="in-cabys-top">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+              <p class="hint">Parámetro <code>top</code> de la API.</p>
+            </div>
+
+            <div class="field field--wide">
+              <p class="field-error" id="err-cabys" role="alert"></p>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="btn btn--primary" id="btn-cabys">
+              <span aria-hidden="true">🔍</span> Buscar
+            </button>
+            <button type="button" class="btn" data-clear="cabys">Limpiar</button>
+            <button type="button" class="btn btn--ghost" data-new="cabys">Nueva consulta</button>
+          </div>
+        </form>
+        <div class="loader" id="load-cabys" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Buscando en el catálogo CABYS…</span>
+        </div>
+        <div id="alert-cabys" role="status" aria-live="polite"></div>
+        <div class="result" id="out-cabys" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">
+  <div class="app-footer__inner">
+    <p>
+      <strong>Fuente oficial de los datos:</strong> Ministerio de Hacienda de Costa Rica —
+      API pública <a href="https://api.hacienda.go.cr/docs" target="_blank" rel="noopener noreferrer">api.hacienda.go.cr/docs</a>.
+      Esta aplicación es una interfaz de consulta independiente; no almacena, modifica ni certifica la
+      información devuelta por el Ministerio.
+    </p>
+    <p class="footer-note">
+      <strong>Uso responsable.</strong> El Ministerio aplica límites de consumo (máximo 20 solicitudes por
+      segundo en ráfagas de 5 segundos y 10 por segundo sostenidas durante 2 minutos). Superarlos bloquea
+      la dirección IP durante 10 minutos. Esta aplicación limita el ritmo de envío, deduplica solicitudes
+      idénticas y mantiene una caché temporal para reducir ese riesgo.
+    </p>
+    <p>
+      <strong>Protección de datos.</strong> Los números de identificación consultados no se almacenan de
+      forma permanente: la caché reside únicamente en la memoria del navegador y se elimina al recargar la
+      página o al pulsar «Limpiar caché». En el almacenamiento local sólo se guardan preferencias no
+      personales (tema visual, duración de caché y, si se configura, la dirección de su propio proxy).
+    </p>
+    <p style="color:var(--text-faint)">
+      Los resultados son de carácter informativo. Para trámites oficiales verifique siempre en los portales
+      del Ministerio de Hacienda.
+    </p>
+    <div class="footer-firma">
+      <img class="footer-firma__logo" src="data:image/jpeg;base64,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"
+           alt="ACC Contadores — Asesoría y Consultoría Contable. Su tranquilidad es nuestro compromiso. Teléfono 8338-0469"
+           width="320" height="291" loading="lazy">
+      <div>
+        <p style="margin:0"><strong>ACC Contadores</strong> — Asesoría y Consultoría Contable</p>
+        <p style="margin:4px 0 0">Teléfono: <a href="tel:+50683380469">8338-0469</a></p>
+        <p style="margin:4px 0 0;color:var(--text-faint)">«Su tranquilidad es nuestro compromiso»</p>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* ========================================================================= */
+/* == § 3 · UTILIDADES DOM Y DE FORMATO ==================================== */
+/* ========================================================================= */
+
+/** Atajo para document.getElementById. */
+const $ = (id) => document.getElementById(id);
+
+/**
+ * Crea un elemento DOM de forma segura.
+ * El texto siempre se asigna con textContent: nunca se interpreta como HTML.
+ * @param {string} tag
+ * @param {Object} [props]  className, text, attrs {}, dataset {}, on {}
+ * @param {Array<Node|string>} [children]
+ */
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  if (props.className) node.className = props.className;
+  if (props.text !== undefined && props.text !== null) node.textContent = String(props.text);
+  if (props.attrs) for (const [k, v] of Object.entries(props.attrs)) {
+    if (v === true) node.setAttribute(k, "");
+    else if (v !== false && v !== null && v !== undefined) node.setAttribute(k, String(v));
+  }
+  if (props.dataset) for (const [k, v] of Object.entries(props.dataset)) node.dataset[k] = String(v);
+  if (props.on) for (const [k, v] of Object.entries(props.on)) node.addEventListener(k, v);
+  for (const c of children) {
+    if (c === null || c === undefined || c === false) continue;
+    node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+  }
+  return node;
+}
+
+/** Vacía un contenedor sin usar innerHTML. */
+function clearNode(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+/** Devuelve true si el valor es "presentable" (no vacío). */
+function hasValue(v) {
+  if (v === null || v === undefined) return false;
+  if (typeof v === "string") return v.trim() !== "";
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === "object") return Object.keys(v).length > 0;
+  return true;
+}
+
+/**
+ * Convierte una clave camelCase/snake_case en una etiqueta legible en español.
+ * Ejemplos: "fechaVencimiento" → "Fecha vencimiento"
+ *           "codigo_proyecto"  → "Codigo proyecto"
+ * Se usa sólo como respaldo cuando un campo no figura en los diccionarios de
+ * etiquetas; nunca sustituye ni reinterpreta el dato devuelto por la API.
+ */
+function humanizeKey(key) {
+  const s = String(key)
+    .replace(/[_\-]+/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** Formatea un número con separadores de es-CR. */
+function fmtNum(n, decimals) {
+  if (typeof n !== "number" || !isFinite(n)) return String(n);
+  const opts = decimals === undefined
+    ? { maximumFractionDigits: 4 }
+    : { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
+  try { return new Intl.NumberFormat("es-CR", opts).format(n); }
+  catch { return String(n); }
+}
+
+/**
+ * Formatea una fecha proveniente de la API.
+ * Se trabaja sobre la cadena para evitar desplazamientos por zona horaria
+ * en valores como "2020-12-15T00:00:00" (sin indicador de zona).
+ */
+function fmtFecha(value) {
+  if (typeof value !== "string") return String(value);
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return value;
+  const [, y, mo, d] = m;
+  const meses = ["enero","febrero","marzo","abril","mayo","junio",
+                 "julio","agosto","setiembre","octubre","noviembre","diciembre"];
+  const idx = parseInt(mo, 10) - 1;
+  if (idx < 0 || idx > 11) return value;
+  return `${parseInt(d, 10)} de ${meses[idx]} de ${y}`;
+}
+
+/** Devuelve la parte AAAA-MM-DD de una fecha de la API, o null. */
+function isoDatePart(value) {
+  if (typeof value !== "string") return null;
+  const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : null;
+}
+
+/** Fecha y hora local legible del momento actual. */
+function nowLabel() {
+  try {
+    return new Intl.DateTimeFormat("es-CR", {
+      dateStyle: "medium", timeStyle: "medium"
+    }).format(new Date());
+  } catch { return new Date().toLocaleString(); }
+}
+
+/** Sello compacto para nombres de archivo: 2026-07-29_1420 */
+function fileStamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+/** Aviso flotante breve. */
+let toastTimer = null;
+function toast(message) {
+  const t = $("toast");
+  t.textContent = message;
+  t.dataset.show = "true";
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.dataset.show = "false"; }, 2200);
+}
+
+/** Copia texto al portapapeles con alternativa para navegadores antiguos. */
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) { console.warn("[copiar] clipboard API falló:", e); }
+  // Alternativa: campo temporal fuera de pantalla
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) { console.warn("[copiar] alternativa falló:", e); return false; }
+}
+
+/**
+ * Descarga un CSV.
+ * - Se antepone BOM UTF-8 para que Microsoft Excel respete las tildes.
+ * - Las celdas que empiezan por = + - @ se prefijan con apóstrofo para
+ *   evitar inyección de fórmulas al abrir el archivo en una hoja de cálculo.
+ */
+function downloadCSV(filename, headers, rows) {
+  const esc = (v) => {
+    let s = (v === null || v === undefined) ? "" : String(v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  };
+  const lines = [headers.map(esc).join(";")];
+  for (const r of rows) lines.push(r.map(esc).join(";"));
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { attrs: { href: url, download: filename } });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+
+/* ========================================================================= */
+/* == § 4 · CONFIGURACIÓN Y CATÁLOGOS ====================================== */
+/* ========================================================================= */
+
+const API_BASE = "https://api.hacienda.go.cr";
+
+/** Rutas oficiales utilizadas por cada módulo. */
+const RUTAS = {
+  ae:            "/fe/ae",
+  tcDolar:       "/indicadores/tc/dolar",
+  ex:            "/fe/ex",
+  agropecuario:  "/fe/agropecuario",
+  pesca:         "/fe/pesca",
+  cabys:         "/fe/cabys"
+};
+
+/** Preferencias persistentes (no contienen datos personales). */
+const PREFS_KEY = "verificadorHaciendaCR.prefs";
+const prefs = {
+  theme: "auto",
+  proxy: "",
+  ttl: 600000
+};
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    if (p && typeof p === "object") {
+      if (["auto", "light", "dark"].includes(p.theme)) prefs.theme = p.theme;
+      if (typeof p.proxy === "string") prefs.proxy = p.proxy;
+      if (typeof p.ttl === "number" && p.ttl >= 0) prefs.ttl = p.ttl;
+    }
+  } catch (e) { console.warn("[prefs] no se pudieron leer las preferencias:", e); }
+}
+
+function savePrefs() {
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
+  catch (e) { console.warn("[prefs] no se pudieron guardar las preferencias:", e); }
+}
+
+/**
+ * Catálogo oficial de tipos de identificación de la factura electrónica
+ * de Costa Rica. La API devuelve únicamente el código; la descripción se
+ * muestra siempre acompañada del código original para no ocultar el dato real.
+ */
+const TIPOS_IDENTIFICACION = {
+  "01": "Cédula de persona física",
+  "02": "Cédula de persona jurídica",
+  "03": "DIMEX (documento de identidad migratorio para extranjeros)",
+  "04": "NITE (número de identificación tributario especial)",
+  "05": "Extranjero no domiciliado",
+  "06": "No contribuyente"
+};
+
+/** Interpretación habitual de los códigos de las actividades económicas. */
+const ACTIVIDAD_ESTADO = { "A": "Activa", "I": "Inactiva" };
+const ACTIVIDAD_TIPO   = { "P": "Principal", "S": "Secundaria" };
+
+
+/* ========================================================================= */
+/* == § 5 · CACHÉ TEMPORAL EN MEMORIA ====================================== */
+/* ========================================================================= */
+/*
+ * La caché vive exclusivamente en memoria (Map). No se escribe en disco,
+ * ni en localStorage, ni en sessionStorage. Al recargar la página desaparece.
+ * Su propósito es cumplir la recomendación oficial de "usar caché local para
+ * evitar consultas innecesarias".
+ */
+const cache = new Map();   // url -> { time:number, data:any }
+
+function cacheGet(url) {
+  if (prefs.ttl <= 0) return null;
+  const hit = cache.get(url);
+  if (!hit) return null;
+  if (Date.now() - hit.time > prefs.ttl) { cache.delete(url); updateCacheCount(); return null; }
+  return hit.data;
+}
+
+function cacheSet(url, data) {
+  if (prefs.ttl <= 0) return;
+  cache.set(url, { time: Date.now(), data });
+  updateCacheCount();
+}
+
+function cacheClear() {
+  cache.clear();
+  probeState.ok = null;
+  probeState.time = 0;
+  updateCacheCount();
+}
+
+function updateCacheCount() {
+  const node = $("cache-count");
+  if (node) node.textContent = String(cache.size);
+}
+
+
+/* ========================================================================= */
+/* == § 6 · LIMITADOR DE TASA Y DEDUPLICACIÓN ============================== */
+/* ========================================================================= */
+/*
+ * Política oficial (https://api.hacienda.go.cr/docs):
+ *   · Ráfaga    : 20 solicitudes/seg durante 5 seg  (máx. 100 en 5 seg)
+ *   · Sostenido : 10 solicitudes/seg durante 120 seg (máx. 1200 en 2 min)
+ *   · Consecuencia de superarlos: bloqueo de la IP por 10 minutos.
+ *
+ * Como una aplicación de escritorio nunca necesita ese caudal, se aplica un
+ * margen muy conservador: como máximo 2 solicitudes simultáneas y una nueva
+ * solicitud cada 200 ms (≈5 por segundo), la mitad del umbral sostenido.
+ */
+const limiter = {
+  maxConcurrent: 2,
+  minIntervalMs: 200,
+  active: 0,
+  lastStart: 0,
+  queue: [],
+
+  run(task) {
+    return new Promise((resolve, reject) => {
+      this.queue.push({ task, resolve, reject });
+      this._pump();
+    });
+  },
+
+  _pump() {
+    if (this.queue.length === 0 || this.active >= this.maxConcurrent) return;
+    const wait = Math.max(0, this.minIntervalMs - (Date.now() - this.lastStart));
+    if (wait > 0) { setTimeout(() => this._pump(), wait); return; }
+
+    const item = this.queue.shift();
+    this.active++;
+    this.lastStart = Date.now();
+    Promise.resolve()
+      .then(item.task)
+      .then(item.resolve, item.reject)
+      .finally(() => { this.active--; this._pump(); });
+    this._pump();
+  }
+};
+
+/**
+ * Solicitudes en vuelo, indexadas por URL.
+ * Si un usuario pulsa el botón dos veces, o dos módulos piden lo mismo,
+ * se reutiliza la misma promesa en lugar de generar una segunda solicitud.
+ */
+const inflight = new Map();
+
+
+/* ========================================================================= */
+/* == § 7 · CLIENTE HTTP =================================================== */
+/* ========================================================================= */
+
+/** Error tipificado: `kind` permite traducirlo a un mensaje comprensible. */
+class ApiError extends Error {
+  constructor(kind, { status = null, detail = "", retryAfter = null } = {}) {
+    super(kind);
+    this.name = "ApiError";
+    this.kind = kind;
+    this.status = status;
+    this.detail = detail;
+    this.retryAfter = retryAfter;
+  }
+}
+
+/** Traducción de cada tipo de error a un mensaje para la persona usuaria. */
+const MENSAJES_ERROR = {
+  offline: {
+    tono: "err",
+    titulo: "Sin conexión a Internet",
+    texto: "Su dispositivo no tiene conexión. Verifique la red e intente nuevamente."
+  },
+  timeout: {
+    tono: "err",
+    titulo: "Tiempo de espera agotado",
+    texto: "El servicio del Ministerio de Hacienda tardó demasiado en responder. Intente de nuevo en unos minutos."
+  },
+  network: {
+    tono: "err",
+    titulo: "No fue posible comunicarse con el servicio",
+    texto: "La solicitud no llegó a completarse. Puede tratarse de una interrupción momentánea de la red o del servicio oficial."
+  },
+  cors: {
+    tono: "err",
+    titulo: "El navegador bloqueó la respuesta",
+    texto: "El servicio respondió, pero sin las cabeceras que el navegador exige para leer el contenido (CORS). Si el problema persiste, configure su propio proxy en «Configuración avanzada»."
+  },
+  "sin-resultado": {
+    tono: "warn",
+    titulo: "No se encontró información",
+    texto: "El servicio oficial no devolvió datos para el valor consultado. Normalmente significa que el registro no existe (404) o que el formato fue rechazado (400). Revise el dato ingresado."
+  },
+  "bad-request": {
+    tono: "warn",
+    titulo: "Parámetro faltante o con formato inválido",
+    texto: "El servicio rechazó la solicitud (código 400). Revise el valor ingresado y su formato."
+  },
+  "not-found": {
+    tono: "warn",
+    titulo: "Registro no encontrado",
+    texto: "El servicio oficial no tiene información registrada para el valor consultado (código 404)."
+  },
+  "rate-limited": {
+    tono: "err",
+    titulo: "Límite de consultas excedido",
+    texto: "El Ministerio de Hacienda ha limitado temporalmente las consultas desde esta conexión (código 429). Espere unos minutos antes de volver a intentarlo. Los bloqueos automáticos duran alrededor de 10 minutos."
+  },
+  server: {
+    tono: "err",
+    titulo: "Servicio oficial temporalmente no disponible",
+    texto: "El servidor del Ministerio de Hacienda devolvió un error interno. No es un problema de su consulta; intente más tarde."
+  },
+  vacia: {
+    tono: "warn",
+    titulo: "Respuesta vacía",
+    texto: "El servicio respondió correctamente pero sin contenido para mostrar."
+  },
+  formato: {
+    tono: "err",
+    titulo: "Respuesta con formato inesperado",
+    texto: "El servicio devolvió información que no se pudo interpretar. Se muestra el contenido original para su revisión."
+  },
+  desconocido: {
+    tono: "err",
+    titulo: "Error inesperado",
+    texto: "Ocurrió un problema al procesar la consulta. Los detalles técnicos están disponibles en la consola del navegador."
+  }
+};
+
+/**
+ * Sonda de conectividad.
+ *
+ * Motivo: las respuestas 400 y 404 de api.hacienda.go.cr las sirve la capa
+ * estática de Akamai y NO incluyen la cabecera Access-Control-Allow-Origin.
+ * El navegador, por tanto, bloquea la lectura y `fetch` rechaza con TypeError,
+ * exactamente igual que si no hubiera conexión.
+ *
+ * Para distinguir ambos casos se consulta un recurso que sí devuelve cabeceras
+ * CORS en estado 200 (/indicadores/tc/dolar). Si la sonda responde, la red
+ * funciona y el fallo anterior corresponde a un 400/404 sin CORS.
+ * El resultado se recuerda 60 segundos para no generar tráfico adicional.
+ */
+const probeState = { ok: null, time: 0, promise: null };
+
+async function connectivityProbe() {
+  if (probeState.ok !== null && Date.now() - probeState.time < 60000) return probeState.ok;
+  if (probeState.promise) return probeState.promise;
+
+  probeState.promise = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const res = await limiter.run(() =>
+        fetch(buildUrl(RUTAS.tcDolar, {}), { signal: ctrl.signal, cache: "no-store", credentials: "omit" })
+      );
+      clearTimeout(t);
+      probeState.ok = res.ok;
+    } catch (e) {
+      console.warn("[sonda] la comprobación de conectividad falló:", e);
+      probeState.ok = false;
+    }
+    probeState.time = Date.now();
+    probeState.promise = null;
+    return probeState.ok;
+  })();
+
+  return probeState.promise;
+}
+
+/** Construye la URL final, respetando el proxy configurado si lo hay. */
+function buildUrl(path, params) {
+  const base = prefs.proxy ? prefs.proxy.replace(/\/+$/, "") : API_BASE;
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v !== undefined && v !== null && String(v) !== "") qs.set(k, String(v));
+  }
+  const q = qs.toString();
+  return base + path + (q ? "?" + q : "");
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Realiza una solicitud GET a la API oficial.
+ *
+ * Incluye: caché temporal, deduplicación, limitación de ritmo, timeout,
+ * reintentos controlados con espera progresiva y clasificación de errores.
+ *
+ * @param {string} path    Ruta oficial (constantes RUTAS)
+ * @param {Object} params  Parámetros de consulta
+ * @param {Object} [opts]  { timeout, maxRetries, allowCache }
+ * @returns {Promise<any>} Cuerpo JSON ya interpretado
+ * @throws  {ApiError}
+ */
+async function apiGet(path, params, opts = {}) {
+  const timeout    = opts.timeout    ?? 15000;
+  const maxRetries = opts.maxRetries ?? 3;   // máximo 3 reintentos automáticos
+  const allowCache = opts.allowCache !== false;
+
+  // Los reintentos por tiempo agotado se limitan aparte: tres esperas
+  // completas encadenadas dejarían a la persona usuaria más de un minuto
+  // frente al indicador de proceso.
+  const maxTimeoutRetries = 1;
+  let timeoutsSufridos = 0;
+
+  const url = buildUrl(path, params);
+
+  if (allowCache) {
+    const hit = cacheGet(url);
+    if (hit !== null) { console.info("[caché] respuesta reutilizada para", path); return hit; }
+  }
+  if (inflight.has(url)) { console.info("[dedup] solicitud ya en curso para", path); return inflight.get(url); }
+
+  const promise = (async () => {
+    if (navigator.onLine === false) throw new ApiError("offline");
+
+    let intento = 0;
+    let ultimo = null;
+
+    while (intento <= maxRetries) {
+      if (intento > 0) {
+        // Espera progresiva: 1 s, 2 s, 4 s (+ variación aleatoria)
+        const espera = ultimo?.retryAfter
+          ? Math.min(ultimo.retryAfter * 1000, 15000)
+          : Math.min(1000 * Math.pow(2, intento - 1), 8000) + Math.random() * 400;
+        console.info(`[reintento ${intento}/${maxRetries}] esperando ${Math.round(espera)} ms`);
+        await sleep(espera);
+      }
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeout);
+
+      try {
+        const res = await limiter.run(() =>
+          fetch(url, {
+            method: "GET",
+            signal: ctrl.signal,
+            cache: "no-store",
+            credentials: "omit",
+            redirect: "follow"
+            // No se envían cabeceras personalizadas: así la solicitud sigue
+            // siendo "simple" y el navegador no realiza preflight OPTIONS.
+          })
+        );
+        clearTimeout(timer);
+
+        // ---- Respuestas con código de error ----------------------------
+        if (!res.ok) {
+          const cuerpo = await res.text().catch(() => "");
+          console.warn(`[api] ${res.status} en ${path}`, cuerpo.slice(0, 400));
+
+          if (res.status === 429) {
+            const ra = parseInt(res.headers.get("Retry-After") || "", 10);
+            ultimo = new ApiError("rate-limited", {
+              status: 429, detail: cuerpo.slice(0, 300),
+              retryAfter: isFinite(ra) ? ra : null
+            });
+            intento++; continue;                       // 429 sí se reintenta
+          }
+          if (res.status >= 500) {
+            ultimo = new ApiError("server", { status: res.status, detail: cuerpo.slice(0, 300) });
+            intento++; continue;                       // 5xx sí se reintenta
+          }
+          if (res.status === 404) throw new ApiError("not-found",   { status: 404, detail: cuerpo.slice(0, 300) });
+          if (res.status === 400) throw new ApiError("bad-request", { status: 400, detail: cuerpo.slice(0, 300) });
+          throw new ApiError("desconocido", { status: res.status, detail: cuerpo.slice(0, 300) });
+        }
+
+        // ---- Respuesta 200: interpretar el JSON -------------------------
+        const texto = await res.text();
+        if (!texto || !texto.trim()) throw new ApiError("vacia", { status: res.status });
+
+        let datos;
+        try { datos = JSON.parse(texto); }
+        catch (e) {
+          console.error("[api] JSON inválido:", texto.slice(0, 400));
+          throw new ApiError("formato", { status: res.status, detail: texto.slice(0, 300) });
+        }
+
+        // Algunos servicios (/fe/agropecuario, /fe/pesca) responden HTTP 200
+        // con un cuerpo de error RFC 7231: { title:"Not Found", status:404 }
+        const incrustado = detectarErrorIncrustado(datos);
+        if (incrustado) throw incrustado;
+
+        if (allowCache) cacheSet(url, datos);
+        return datos;
+
+      } catch (err) {
+        clearTimeout(timer);
+
+        if (err instanceof ApiError) {
+          // Los errores definitivos no se reintentan
+          if (["not-found", "bad-request", "vacia", "formato", "offline"].includes(err.kind)) throw err;
+          ultimo = err; intento++; continue;
+        }
+
+        if (err && err.name === "AbortError") {
+          const fallo = new ApiError("timeout", { detail: `Sin respuesta tras ${timeout} ms` });
+          timeoutsSufridos++;
+          if (timeoutsSufridos > maxTimeoutRetries) throw fallo;
+          ultimo = fallo; intento++; continue;
+        }
+
+        // TypeError: red caída, DNS, o respuesta sin cabeceras CORS.
+        if (err instanceof TypeError) {
+          console.warn("[api] fallo de red o CORS en", path, err);
+          const red = await connectivityProbe();
+          if (!red) { ultimo = new ApiError("network", { detail: String(err) }); intento++; continue; }
+          // La red funciona: se trata de un 400/404 sin cabeceras CORS.
+          throw new ApiError("sin-resultado", {
+            detail: "Respuesta 400/404 sin cabecera Access-Control-Allow-Origin. " +
+                    "El navegador impide leer el cuerpo. Detalle original: " + String(err)
+          });
+        }
+
+        ultimo = new ApiError("desconocido", { detail: String(err) });
+        intento++;
+      }
+    }
+
+    throw ultimo || new ApiError("desconocido");
+  })();
+
+  inflight.set(url, promise);
+  try { return await promise; }
+  finally { inflight.delete(url); }
+}
+
+/**
+ * Detecta cuerpos de error devueltos con código HTTP 200.
+ * Casos verificados contra la API oficial:
+ *   { "title":"Not Found", "status":404, "type":"...rfc7231..." }   → /fe/agropecuario, /fe/pesca
+ *   { "code":404, "status":"Information no available..." }          → capa estática
+ */
+function detectarErrorIncrustado(datos) {
+  if (!datos || typeof datos !== "object" || Array.isArray(datos)) return null;
+
+  const status = typeof datos.status === "number" ? datos.status
+               : typeof datos.code   === "number" ? datos.code
+               : null;
+
+  if (status === 404) return new ApiError("not-found",   { status: 404, detail: JSON.stringify(datos).slice(0, 300) });
+  if (status === 400) return new ApiError("bad-request", { status: 400, detail: JSON.stringify(datos).slice(0, 300) });
+  if (status === 429) return new ApiError("rate-limited",{ status: 429, detail: JSON.stringify(datos).slice(0, 300) });
+  if (status !== null && status >= 500) return new ApiError("server", { status, detail: JSON.stringify(datos).slice(0, 300) });
+
+  // Variante textual: { code:404, status:"Information no available on this system..." }
+  if (typeof datos.code === "number" && typeof datos.status === "string" && datos.code >= 400) {
+    const kind = datos.code === 404 ? "not-found"
+               : datos.code === 400 ? "bad-request"
+               : datos.code === 429 ? "rate-limited"
+               : datos.code >= 500  ? "server" : "desconocido";
+    return new ApiError(kind, { status: datos.code, detail: datos.status });
+  }
+  return null;
+}
+
+
+/* ========================================================================= */
+/* == § 8 · COMPONENTE DE TABLA ============================================ */
+/* ========================================================================= */
+/*
+ * Tabla reutilizable con filtro de texto, ordenamiento por columna,
+ * paginación, exportación a CSV y botón de copiado por fila.
+ * Todo el contenido se inserta con textContent.
+ */
+
+class DataTable {
+  /**
+   * @param {Object} cfg
+   *   columns   [{ key, label, align?, mono?, format?(v,row), sortValue?(row), csv?(v,row) }]
+   *   rows      Array<Object>
+   *   pageSize  número de filas por página (0 = sin paginación)
+   *   csvName   nombre base del archivo CSV
+   *   copyKey   clave cuyo valor ofrece un botón "Copiar"
+   *   emptyText texto cuando el filtro no arroja coincidencias
+   */
+  constructor(cfg) {
+    this.columns  = cfg.columns;
+    this.rows     = cfg.rows || [];
+    this.pageSize = cfg.pageSize ?? 25;
+    this.csvName  = cfg.csvName || "resultados";
+    this.copyKey  = cfg.copyKey || null;
+    this.emptyText= cfg.emptyText || "Ningún registro coincide con el filtro aplicado.";
+
+    this.filterText = "";
+    this.sortKey = null;
+    this.sortDir = "asc";
+    this.page = 1;
+
+    this.root = el("div");
+    this._buildTools();
+    this.scroll = el("div", { className: "table-scroll" });
+    this.root.appendChild(this.scroll);
+    this._buildFoot();
+    this.render();
+  }
+
+  /** Barra superior: filtro y exportación. */
+  _buildTools() {
+    const filtroId = "flt-" + Math.random().toString(36).slice(2, 9);
+
+    this.filterInput = el("input", {
+      className: "input table-filter",
+      attrs: { type: "search", id: filtroId, placeholder: "Filtrar resultados…", autocomplete: "off" },
+      on: { input: (e) => { this.filterText = e.target.value.trim().toLowerCase(); this.page = 1; this.render(); } }
+    });
+
+    const csvBtn = el("button", {
+      className: "btn btn--sm", attrs: { type: "button" },
+      on: { click: () => this.exportCSV() }
+    }, [el("span", { text: "⬇️", attrs: { "aria-hidden": "true" } }), " Descargar CSV"]);
+
+    const tools = el("div", { className: "table-tools" }, [
+      el("div", { className: "table-tools__group" }, [
+        el("label", { className: "sr-only", text: "Filtrar resultados", attrs: { for: filtroId } }),
+        this.filterInput
+      ]),
+      el("div", { className: "table-tools__group" }, [csvBtn])
+    ]);
+    this.root.appendChild(tools);
+  }
+
+  /** Barra inferior: conteo y paginación. */
+  _buildFoot() {
+    this.countLabel = el("span", { text: "" });
+    this.pager = el("div", { className: "pager" });
+    this.root.appendChild(el("div", { className: "table-foot" }, [this.countLabel, this.pager]));
+  }
+
+  /** Filas tras aplicar filtro y orden. */
+  _processed() {
+    let data = this.rows;
+
+    if (this.filterText) {
+      data = data.filter((row) =>
+        this.columns.some((c) => {
+          const v = c.format ? c.format(row[c.key], row) : row[c.key];
+          return String(v ?? "").toLowerCase().includes(this.filterText);
+        })
+      );
+    }
+
+    if (this.sortKey) {
+      const col = this.columns.find((c) => c.key === this.sortKey);
+      const dir = this.sortDir === "asc" ? 1 : -1;
+      data = data.slice().sort((a, b) => {
+        const va = col.sortValue ? col.sortValue(a) : a[this.sortKey];
+        const vb = col.sortValue ? col.sortValue(b) : b[this.sortKey];
+        if (va === vb) return 0;
+        if (va === null || va === undefined) return 1;
+        if (vb === null || vb === undefined) return -1;
+        if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+        return String(va).localeCompare(String(vb), "es-CR", { numeric: true, sensitivity: "base" }) * dir;
+      });
+    }
+    return data;
+  }
+
+  render() {
+    const data = this._processed();
+    const total = data.length;
+    const pageSize = this.pageSize > 0 ? this.pageSize : total || 1;
+    const pages = Math.max(1, Math.ceil(total / pageSize));
+    if (this.page > pages) this.page = pages;
+    const start = (this.page - 1) * pageSize;
+    const slice = this.pageSize > 0 ? data.slice(start, start + pageSize) : data;
+
+    clearNode(this.scroll);
+
+    const table = el("table", { className: "data stackable" });
+
+    // Encabezado con botones de ordenamiento
+    const thead = el("thead");
+    const trh = el("tr");
+    for (const c of this.columns) {
+      const th = el("th", { attrs: { scope: "col" } });
+      if (this.sortKey === c.key) th.setAttribute("aria-sort", this.sortDir === "asc" ? "ascending" : "descending");
+      const flecha = this.sortKey === c.key ? (this.sortDir === "asc" ? "▲" : "▼") : "↕";
+      th.appendChild(el("button", {
+        className: "th-sort",
+        attrs: { type: "button", title: `Ordenar por ${c.label}` },
+        on: {
+          click: () => {
+            if (this.sortKey === c.key) this.sortDir = this.sortDir === "asc" ? "desc" : "asc";
+            else { this.sortKey = c.key; this.sortDir = "asc"; }
+            this.page = 1;
+            this.render();
+          }
+        }
+      }, [
+        el("span", { text: c.label }),
+        el("span", { className: "th-sort__arrow", text: flecha, attrs: { "aria-hidden": "true" } })
+      ]));
+      trh.appendChild(th);
+    }
+    if (this.copyKey) trh.appendChild(el("th", { text: "Acción", attrs: { scope: "col" } }));
+    thead.appendChild(trh);
+    table.appendChild(thead);
+
+    // Cuerpo
+    const tbody = el("tbody");
+    if (slice.length === 0) {
+      const td = el("td", { text: this.emptyText, attrs: { colspan: String(this.columns.length + (this.copyKey ? 1 : 0)) } });
+      td.style.textAlign = "center";
+      td.style.color = "var(--text-faint)";
+      tbody.appendChild(el("tr", {}, [td]));
+    } else {
+      for (const row of slice) {
+        const tr = el("tr");
+        for (const c of this.columns) {
+          const valor = c.format ? c.format(row[c.key], row) : row[c.key];
+          const td = el("td", {
+            text: (valor === null || valor === undefined || valor === "") ? "—" : valor,
+            dataset: { label: c.label }
+          });
+          if (c.align === "right") td.classList.add("num");
+          if (c.mono) td.classList.add("mono");
+          tr.appendChild(td);
+        }
+        if (this.copyKey) {
+          const val = String(row[this.copyKey] ?? "");
+          const td = el("td", { dataset: { label: "Acción" } }, [
+            el("button", {
+              className: "btn btn--sm",
+              attrs: { type: "button", "aria-label": `Copiar ${val}` },
+              on: {
+                click: async (e) => {
+                  const ok = await copyText(val);
+                  toast(ok ? `Código ${val} copiado` : "No se pudo copiar");
+                  if (ok) {
+                    const b = e.currentTarget;
+                    const prev = b.textContent;
+                    b.textContent = "✔ Copiado";
+                    setTimeout(() => { b.textContent = prev; }, 1400);
+                  }
+                }
+              }
+            }, ["📋 Copiar"])
+          ]);
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+    }
+    table.appendChild(tbody);
+    this.scroll.appendChild(table);
+
+    // Conteo
+    const desde = total === 0 ? 0 : start + 1;
+    const hasta = Math.min(start + pageSize, total);
+    this.countLabel.textContent = this.pageSize > 0
+      ? `Mostrando ${desde}–${hasta} de ${total} registro${total === 1 ? "" : "s"}`
+      : `${total} registro${total === 1 ? "" : "s"}`;
+
+    // Paginación
+    clearNode(this.pager);
+    if (this.pageSize > 0 && pages > 1) {
+      const mk = (txt, destino, deshabilitado, etiqueta) => el("button", {
+        className: "btn btn--sm",
+        text: txt,
+        attrs: { type: "button", "aria-label": etiqueta, disabled: deshabilitado },
+        on: { click: () => { this.page = destino; this.render(); } }
+      });
+      this.pager.appendChild(mk("«", 1, this.page === 1, "Primera página"));
+      this.pager.appendChild(mk("‹", this.page - 1, this.page === 1, "Página anterior"));
+      this.pager.appendChild(el("span", { text: `Página ${this.page} de ${pages}` }));
+      this.pager.appendChild(mk("›", this.page + 1, this.page === pages, "Página siguiente"));
+      this.pager.appendChild(mk("»", pages, this.page === pages, "Última página"));
+    }
+  }
+
+  /** Exporta las filas actualmente filtradas y ordenadas (todas las páginas). */
+  exportCSV() {
+    const data = this._processed();
+    if (data.length === 0) { toast("No hay datos que exportar"); return; }
+    const headers = this.columns.map((c) => c.label);
+    const rows = data.map((row) => this.columns.map((c) => {
+      if (c.csv) return c.csv(row[c.key], row);
+      const v = c.format ? c.format(row[c.key], row) : row[c.key];
+      return v ?? "";
+    }));
+    downloadCSV(`${this.csvName}_${fileStamp()}.csv`, headers, rows);
+    toast(`CSV descargado (${data.length} filas)`);
+  }
+}
+
+
+/* ========================================================================= */
+/* == § 9 · INFRAESTRUCTURA DE LA INTERFAZ ================================= */
+/* ========================================================================= */
+
+/* --- 9.1 Pestañas accesibles (patrón ARIA Tabs) -------------------------- */
+function initTabs() {
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+
+  function activar(tab, mover = true) {
+    for (const t of tabs) {
+      const activo = t === tab;
+      t.setAttribute("aria-selected", activo ? "true" : "false");
+      t.tabIndex = activo ? 0 : -1;
+      const panel = $(t.getAttribute("aria-controls"));
+      if (panel) panel.hidden = !activo;
+    }
+    if (mover) tab.focus();
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener("click", () => activar(tab, false));
+    tab.addEventListener("keydown", (e) => {
+      let destino = null;
+      if (e.key === "ArrowRight") destino = tabs[(i + 1) % tabs.length];
+      else if (e.key === "ArrowLeft") destino = tabs[(i - 1 + tabs.length) % tabs.length];
+      else if (e.key === "Home") destino = tabs[0];
+      else if (e.key === "End") destino = tabs[tabs.length - 1];
+      if (destino) { e.preventDefault(); activar(destino); }
+    });
+  });
+}
+
+/* --- 9.2 Tema claro / oscuro / automático -------------------------------- */
+const TEMAS = [
+  { id: "auto",  ico: "🌓", label: "Tema automático" },
+  { id: "light", ico: "☀️", label: "Tema claro" },
+  { id: "dark",  ico: "🌙", label: "Tema oscuro" }
+];
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", prefs.theme);
+  const t = TEMAS.find((x) => x.id === prefs.theme) || TEMAS[0];
+  $("theme-ico").textContent = t.ico;
+  $("theme-label").textContent = t.label;
+  $("btn-theme").setAttribute("aria-label", `${t.label}. Pulse para cambiar el modo de visualización.`);
+}
+
+function initTheme() {
+  applyTheme();
+  $("btn-theme").addEventListener("click", () => {
+    const i = TEMAS.findIndex((x) => x.id === prefs.theme);
+    prefs.theme = TEMAS[(i + 1) % TEMAS.length].id;
+    applyTheme();
+    savePrefs();
+  });
+}
+
+/* --- 9.3 Mensajes, indicadores y estado de red --------------------------- */
+const ICONOS_ALERTA = { ok: "✅", warn: "⚠️", err: "⛔", info: "ℹ️" };
+
+/**
+ * Muestra un mensaje en el contenedor indicado.
+ * @param {string} id     id del contenedor de alertas
+ * @param {"ok"|"warn"|"err"|"info"} tono
+ * @param {string} titulo
+ * @param {string} texto
+ * @param {string} [detalle] detalle técnico opcional (visible, breve)
+ * @param {{url:string, texto:string}} [enlace] enlace a una fuente oficial alternativa
+ * @param {{texto:string, onClick:Function}} [accion] botón de acción dentro del mensaje
+ */
+function showAlert(id, tono, titulo, texto, detalle, enlace, accion) {
+  const cont = $(id);
+  clearNode(cont);
+  const cuerpo = el("div", { className: "alert__body" }, [
+    el("div", { className: "alert__title", text: titulo }),
+    el("div", { text: texto })
+  ]);
+  if (detalle) cuerpo.appendChild(el("div", { className: "alert__detail", text: detalle }));
+  if (enlace && enlace.url) {
+    cuerpo.appendChild(el("div", { className: "alert__detail" }, [
+      el("a", {
+        text: enlace.texto,
+        attrs: { href: enlace.url, target: "_blank", rel: "noopener noreferrer" }
+      }),
+      el("span", { text: " (se abre en una pestaña nueva)" })
+    ]));
+  }
+  if (accion && typeof accion.onClick === "function") {
+    cuerpo.appendChild(el("div", { className: "alert__detail" }, [
+      el("button", {
+        className: "btn btn--sm",
+        text: accion.texto,
+        attrs: { type: "button" },
+        on: { click: accion.onClick }
+      })
+    ]));
+  }
+  cont.appendChild(el("div", { className: `alert alert--${tono}` }, [
+    el("span", { className: "alert__ico", text: ICONOS_ALERTA[tono], attrs: { "aria-hidden": "true" } }),
+    cuerpo
+  ]));
+}
+
+/**
+ * Portales oficiales de consulta alternativos.
+ *
+ * Se ofrecen únicamente como ENLACE, para que la persona usuaria verifique
+ * por su cuenta cuando el servicio de Hacienda no devuelve datos. Ninguno se
+ * consulta de forma automática: son instituciones distintas, con sus propias
+ * condiciones de uso.
+ */
+const PORTALES_OFICIALES = {
+  magProductor: {
+    url: "https://mag.go.cr/servicios-y-tramites/consultaproductor/",
+    texto: "Consulta pública del registro de persona productora agropecuaria (MAG)"
+  },
+  incopesca: {
+    url: "https://www.incopesca.go.cr/tramites_servicios/",
+    texto: "Trámites y servicios del INCOPESCA"
+  }
+};
+
+function clearAlert(id) { clearNode($(id)); }
+
+function setLoading(loaderId, botonId, activo) {
+  const l = $(loaderId);
+  if (l) l.dataset.active = activo ? "true" : "false";
+  const b = $(botonId);
+  if (b) { b.disabled = activo; b.setAttribute("aria-busy", activo ? "true" : "false"); }
+}
+
+function marcarUltimaConsulta() { $("last-query").textContent = nowLabel(); }
+
+/** Traduce un ApiError a un mensaje visible y registra el detalle técnico. */
+function mostrarError(alertId, err) {
+  console.error("[error]", err);
+  const info = MENSAJES_ERROR[err?.kind] || MENSAJES_ERROR.desconocido;
+  const detalle = [];
+  if (err?.status) detalle.push(`Código HTTP ${err.status}`);
+  if (err?.kind) detalle.push(`tipo «${err.kind}»`);
+  showAlert(alertId, info.tono, info.titulo, info.texto,
+    detalle.length ? `Detalle técnico: ${detalle.join(" · ")}. Consulte la consola del navegador (F12) para más información.` : null);
+}
+
+function initNetworkStatus() {
+  const pinta = () => {
+    const online = navigator.onLine !== false;
+    $("net-dot").classList.toggle("dot--off", !online);
+    $("net-text").textContent = online ? "Conexión disponible" : "Sin conexión a Internet";
+  };
+  window.addEventListener("online", pinta);
+  window.addEventListener("offline", pinta);
+  pinta();
+}
+
+/* --- 9.4 Botones "Limpiar" y "Nueva consulta" ---------------------------- */
+/** Mapa módulo → elementos que deben restablecerse. */
+const MODULOS = {
+  tributaria:  { form: "form-tributaria",  out: "out-tributaria",  alert: "alert-tributaria",  focus: "in-tributaria" },
+  tcactual:    { form: null,               out: "out-tcactual",    alert: "alert-tcactual",    focus: "btn-tc-actual" },
+  exoneracion: { form: "form-exoneracion", out: "out-exoneracion", alert: "alert-exoneracion", focus: "in-exoneracion" },
+  agro:        { form: "form-agro",        out: "out-agro",        alert: "alert-agro",        focus: "in-agro" },
+  pesca:       { form: "form-pesca",       out: "out-pesca",       alert: "alert-pesca",       focus: "in-pesca" },
+  cabys:       { form: "form-cabys",       out: "out-cabys",       alert: "alert-cabys",       focus: "in-cabys-codigo" }
+};
+
+function limpiarModulo(nombre, { conservarEntrada = false } = {}) {
+  const m = MODULOS[nombre];
+  if (!m) return;
+  if (m.form && !conservarEntrada) {
+    const f = $(m.form);
+    if (f) {
+      f.reset();
+      f.querySelectorAll("[aria-invalid]").forEach((i) => i.removeAttribute("aria-invalid"));
+      f.querySelectorAll(".field-error").forEach((p) => { p.textContent = ""; });
+    }
+  }
+  clearNode($(m.out));
+  clearAlert(m.alert);
+  if (nombre === "exoneracion") $("preview-exoneracion").textContent = "—";
+  if (nombre === "cabys") sincronizarModoCabys();
+}
+
+function initBotonesComunes() {
+  document.querySelectorAll("[data-clear]").forEach((b) => {
+    b.addEventListener("click", () => limpiarModulo(b.dataset.clear));
+  });
+  document.querySelectorAll("[data-new]").forEach((b) => {
+    b.addEventListener("click", () => {
+      const nombre = b.dataset.new;
+      limpiarModulo(nombre);
+      const m = MODULOS[nombre];
+      const f = m && $(m.focus);
+      if (f) f.focus();
+    });
+  });
+}
+
+/* --- 9.5 Configuración avanzada ------------------------------------------ */
+function initConfig() {
+  $("cfg-proxy").value = prefs.proxy;
+  $("cfg-ttl").value = String(prefs.ttl);
+
+  $("cfg-save").addEventListener("click", () => {
+    const url = $("cfg-proxy").value.trim();
+    if (url) {
+      try {
+        const u = new URL(url);
+        if (u.protocol !== "https:" && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") {
+          showAlert("cfg-alert", "err", "Dirección no válida",
+            "Por seguridad, el proxy debe utilizar HTTPS (se admite HTTP únicamente en localhost).");
+          return;
+        }
+      } catch {
+        showAlert("cfg-alert", "err", "Dirección no válida",
+          "Escriba una dirección completa, por ejemplo https://mi-proxy.midominio.workers.dev");
+        return;
+      }
+    }
+    prefs.proxy = url;
+    prefs.ttl = parseInt($("cfg-ttl").value, 10) || 0;
+    savePrefs();
+    cacheClear();
+    showAlert("cfg-alert", "ok", "Configuración guardada",
+      prefs.proxy
+        ? "Las consultas se enviarán a través del proxy indicado. Se vació la caché."
+        : "Las consultas se enviarán directamente a api.hacienda.go.cr. Se vació la caché.");
+  });
+
+  $("cfg-reset").addEventListener("click", () => {
+    prefs.proxy = "";
+    prefs.ttl = 600000;
+    $("cfg-proxy").value = "";
+    $("cfg-ttl").value = "600000";
+    savePrefs();
+    cacheClear();
+    showAlert("cfg-alert", "info", "Configuración restablecida",
+      "Se restauraron los valores predeterminados y se vació la caché.");
+  });
+
+  $("btn-clear-cache").addEventListener("click", () => {
+    const n = cache.size;
+    cacheClear();
+    toast(n === 0 ? "La caché ya estaba vacía" : `Caché eliminada (${n} consulta${n === 1 ? "" : "s"})`);
+  });
+}
+
+/* --- 9.6 Ayudas de presentación ------------------------------------------ */
+
+/** Crea un elemento de la lista de pares campo/valor. */
+function dlItem(clave, valor, { mono = false, full = false, nota = null, badge = null } = {}) {
+  const item = el("div", { className: "dl__item" + (full ? " dl__item--full" : "") });
+  item.appendChild(el("div", { className: "dl__k", text: clave }));
+  if (badge) {
+    item.appendChild(el("div", { className: "dl__v" }, [
+      el("span", { className: `badge badge--${badge}`, text: String(valor) })
+    ]));
+  } else {
+    item.appendChild(el("div", { className: "dl__v" + (mono ? " dl__v--mono" : ""), text: String(valor) }));
+  }
+  if (nota) item.appendChild(el("div", { className: "dl__note", text: nota }));
+  return item;
+}
+
+/** Bloque plegable con el JSON original devuelto por la API. */
+function bloqueCrudo(datos, titulo = "Ver respuesta original de la API") {
+  const det = el("details", { className: "raw-wrap" });
+  det.appendChild(el("summary", { text: titulo }));
+  det.appendChild(el("pre", { className: "raw", text: JSON.stringify(datos, null, 2) }));
+  return det;
+}
+
+/** Encabezado de resultados con la marca de tiempo de la consulta. */
+function encabezadoResultado(titulo, meta) {
+  return el("div", { className: "result-head" }, [
+    el("h3", { className: "result-title", text: titulo }),
+    el("span", { className: "result-meta", text: meta || `Consultado el ${nowLabel()}` })
+  ]);
+}
+
+/**
+ * Renderiza de forma genérica y defensiva cualquier objeto devuelto por la API.
+ * Se emplea en los módulos cuyo esquema de respuesta no está documentado
+ * (agropecuario y pesca): no se inventan campos, se muestran los que lleguen
+ * con una etiqueta legible derivada del nombre de la propiedad.
+ *
+ * @param {Object} obj
+ * @param {Object} etiquetas  Diccionario opcional clave → etiqueta
+ * @returns {HTMLElement}
+ */
+function renderObjetoGenerico(obj, etiquetas = {}) {
+  const dl = el("div", { className: "dl" });
+  const anidados = [];
+
+  for (const [clave, valor] of Object.entries(obj)) {
+    if (!hasValue(valor)) continue;
+    const etiqueta = etiquetas[clave] || humanizeKey(clave);
+
+    if (valor !== null && typeof valor === "object") {
+      anidados.push([etiqueta, valor]);
+      continue;
+    }
+
+    let texto = valor;
+    if (typeof valor === "boolean") texto = valor ? "Sí" : "No";
+    else if (typeof valor === "number") texto = fmtNum(valor);
+    else if (typeof valor === "string" && isoDatePart(valor)) texto = fmtFecha(valor);
+
+    dl.appendChild(dlItem(etiqueta, texto, { mono: /codigo|identificacion|numero/i.test(clave) }));
+  }
+
+  const cont = el("div");
+  if (dl.children.length > 0) cont.appendChild(dl);
+
+  // Estructuras anidadas: arreglos de objetos como tabla, resto como sublista
+  for (const [etiqueta, valor] of anidados) {
+    cont.appendChild(el("h4", { className: "subhead", text: etiqueta }));
+
+    if (Array.isArray(valor)) {
+      const objetos = valor.filter((v) => v && typeof v === "object" && !Array.isArray(v));
+      if (objetos.length === valor.length && valor.length > 0) {
+        const claves = [...new Set(valor.flatMap((o) => Object.keys(o)))];
+        const tabla = new DataTable({
+          columns: claves.map((k) => ({
+            key: k,
+            label: etiquetas[k] || humanizeKey(k),
+            format: (v) => {
+              if (v === null || v === undefined) return "";
+              if (typeof v === "boolean") return v ? "Sí" : "No";
+              if (typeof v === "object") return JSON.stringify(v);
+              if (typeof v === "string" && isoDatePart(v)) return fmtFecha(v);
+              return v;
+            }
+          })),
+          rows: valor,
+          pageSize: 25,
+          csvName: "detalle"
+        });
+        cont.appendChild(tabla.root);
+      } else {
+        const sub = el("div", { className: "dl" });
+        valor.forEach((v, i) => sub.appendChild(dlItem(`${etiqueta} ${i + 1}`,
+          typeof v === "object" ? JSON.stringify(v) : v, { mono: true })));
+        cont.appendChild(sub);
+      }
+    } else {
+      cont.appendChild(renderObjetoGenerico(valor, etiquetas));
+    }
+  }
+
+  return cont;
+}
+
+
+/* ========================================================================= */
+/* == § 10 · MÓDULO 1 — SITUACIÓN TRIBUTARIA  (/fe/ae) ===================== */
+/* ========================================================================= */
+
+/**
+ * Valida un número de identificación según la regla oficial:
+ * únicamente dígitos, longitud entre 9 y 12.
+ *
+ * Se añade además una comprobación del cero inicial. Circula documentación
+ * de terceros que afirma lo contrario —que la cédula física debe enviarse
+ * con un 0 delante—, pero la verificación directa contra la API demuestra
+ * que cualquier identificación que empiece por 0 se rechaza con código 400
+ * en los tres endpoints que reciben este parámetro:
+ *
+ *   /fe/ae?identificacion=012345678            → HTTP 400
+ *   /fe/ae?identificacion=112345678            → HTTP 404 (formato aceptado)
+ *   /fe/agropecuario?identificacion=0987654321 → HTTP 400
+ *   /fe/agropecuario?identificacion=1987654321 → HTTP 200 (formato aceptado)
+ *   /fe/pesca?identificacion=098765432         → HTTP 400
+ *   /fe/pesca?identificacion=198765432         → HTTP 200 (formato aceptado)
+ *
+ * Detectarlo aquí evita una solicitud destinada al fracaso y, sobre todo,
+ * evita mostrar un error confuso: en el navegador ese 400 llega sin
+ * cabeceras CORS y se presentaría como «no se encontró información».
+ *
+ * @returns {{ok:boolean, valor?:string, mensaje?:string}}
+ */
+function validarIdentificacion(entrada) {
+  const v = String(entrada || "").trim().replace(/[\s\-.]/g, "");
+  if (v === "") return { ok: false, mensaje: "Escriba un número de identificación." };
+  if (!/^\d+$/.test(v)) return { ok: false, mensaje: "La identificación debe contener únicamente números, sin guiones ni letras." };
+  if (v.length < 9)  return { ok: false, mensaje: `Faltan dígitos: escribió ${v.length} y se requieren entre 9 y 12.` };
+  if (v.length > 12) return { ok: false, mensaje: `Sobran dígitos: escribió ${v.length} y se admiten como máximo 12.` };
+  if (v.startsWith("0")) {
+    return {
+      ok: false,
+      mensaje: "El número no debe comenzar con cero. El servicio del Ministerio de Hacienda rechaza " +
+               "las identificaciones con ceros iniciales: escriba, por ejemplo, 110100123 en lugar de 0110100123."
+    };
+  }
+  return { ok: true, valor: v };
+}
+
+function pintarErrorCampo(errId, inputId, mensaje) {
+  $(errId).textContent = mensaje || "";
+  const input = $(inputId);
+  if (mensaje) { input.setAttribute("aria-invalid", "true"); input.focus(); }
+  else input.removeAttribute("aria-invalid");
+}
+
+function initTributaria() {
+  $("form-tributaria").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const v = validarIdentificacion($("in-tributaria").value);
+    if (!v.ok) { pintarErrorCampo("err-tributaria", "in-tributaria", v.mensaje); return; }
+    pintarErrorCampo("err-tributaria", "in-tributaria", "");
+
+    clearAlert("alert-tributaria");
+    clearNode($("out-tributaria"));
+    setLoading("load-tributaria", "btn-tributaria", true);
+
+    try {
+      const datos = await apiGet(RUTAS.ae, { identificacion: v.valor });
+      marcarUltimaConsulta();
+      renderTributaria(datos, v.valor);
+      showAlert("alert-tributaria", "ok", "Consulta realizada",
+        "La información proviene del Ministerio de Hacienda de Costa Rica.");
+    } catch (err) {
+      if (err?.kind === "not-found" || err?.kind === "sin-resultado") {
+        showAlert("alert-tributaria", "warn", "Contribuyente no encontrado",
+          `No existe información registrada para la identificación ${v.valor}. Verifique el número e intente nuevamente.`);
+      } else {
+        mostrarError("alert-tributaria", err);
+      }
+    } finally {
+      setLoading("load-tributaria", "btn-tributaria", false);
+    }
+  });
+}
+
+function renderTributaria(d, identificacion) {
+  const out = $("out-tributaria");
+  clearNode(out);
+
+  if (!d || typeof d !== "object") {
+    showAlert("alert-tributaria", "warn", MENSAJES_ERROR.vacia.titulo, MENSAJES_ERROR.vacia.texto);
+    return;
+  }
+
+  out.appendChild(encabezadoResultado("Resultado de la consulta"));
+
+  // --- Datos generales ---------------------------------------------------
+  const dl = el("div", { className: "dl" });
+
+  dl.appendChild(dlItem("Identificación consultada", identificacion, { mono: true }));
+
+  if (hasValue(d.nombre)) {
+    dl.appendChild(dlItem("Nombre o razón social", d.nombre, { full: true }));
+  }
+
+  if (hasValue(d.tipoIdentificacion)) {
+    const desc = TIPOS_IDENTIFICACION[d.tipoIdentificacion];
+    dl.appendChild(dlItem("Tipo de identificación",
+      desc ? `${desc} (${d.tipoIdentificacion})` : String(d.tipoIdentificacion),
+      { nota: desc ? "Descripción según el catálogo de facturación electrónica." : "Código devuelto por la API." }));
+  }
+
+  if (d.regimen && typeof d.regimen === "object") {
+    const cod = d.regimen.codigo;
+    const des = d.regimen.descripcion;
+    dl.appendChild(dlItem("Régimen tributario",
+      hasValue(des) ? String(des) : "—",
+      { nota: (cod !== undefined && cod !== null) ? `Código de régimen: ${cod}` : null }));
+  }
+
+  // --- Situación tributaria ---------------------------------------------
+  const s = d.situacion && typeof d.situacion === "object" ? d.situacion : null;
+  if (s) {
+    if (hasValue(s.estado)) {
+      const inscrito = /^inscrito$/i.test(String(s.estado).trim());
+      dl.appendChild(dlItem("Estado ante Tributación", s.estado, { badge: inscrito ? "ok" : "warn" }));
+    }
+    if (hasValue(s.moroso)) {
+      const esMoroso = /^si$/i.test(String(s.moroso).trim());
+      dl.appendChild(dlItem("Moroso", s.moroso, { badge: esMoroso ? "err" : "ok" }));
+    }
+    if (hasValue(s.omiso)) {
+      const esOmiso = /^si$/i.test(String(s.omiso).trim());
+      dl.appendChild(dlItem("Omiso", s.omiso, { badge: esOmiso ? "err" : "ok" }));
+    }
+    if (hasValue(s.administracionTributaria)) {
+      dl.appendChild(dlItem("Administración tributaria", s.administracionTributaria));
+    }
+  }
+
+  out.appendChild(dl);
+
+  // Mensaje oficial adicional (por ejemplo, cuando no está inscrito)
+  if (s && hasValue(s.mensaje)) {
+    const cont = el("div");
+    cont.appendChild(el("div", { className: "alert alert--warn" }, [
+      el("span", { className: "alert__ico", text: "⚠️", attrs: { "aria-hidden": "true" } }),
+      el("div", { className: "alert__body" }, [
+        el("div", { className: "alert__title", text: "Mensaje del Ministerio de Hacienda" }),
+        el("div", { text: String(s.mensaje) })
+      ])
+    ]));
+    out.appendChild(cont);
+  }
+
+  // --- Actividades económicas -------------------------------------------
+  out.appendChild(el("h4", { className: "subhead", text: "🏷️ Actividades económicas" }));
+
+  const acts = Array.isArray(d.actividades) ? d.actividades : [];
+  if (acts.length === 0) {
+    out.appendChild(el("div", { className: "alert alert--info" }, [
+      el("span", { className: "alert__ico", text: "ℹ️", attrs: { "aria-hidden": "true" } }),
+      el("div", { className: "alert__body" }, [
+        el("div", { text: "El servicio no devolvió actividades económicas asociadas a esta identificación." })
+      ])
+    ]));
+  } else {
+    const tabla = new DataTable({
+      columns: [
+        { key: "codigo", label: "Código", mono: true },
+        { key: "descripcion", label: "Descripción de la actividad" },
+        { key: "tipo", label: "Tipo",
+          format: (v) => ACTIVIDAD_TIPO[v] ? `${ACTIVIDAD_TIPO[v]} (${v})` : (v ?? "") },
+        { key: "estado", label: "Estado",
+          format: (v) => ACTIVIDAD_ESTADO[v] ? `${ACTIVIDAD_ESTADO[v]} (${v})` : (v ?? "") }
+      ],
+      rows: acts,
+      pageSize: 15,
+      csvName: `actividades_${identificacion}`,
+      copyKey: "codigo"
+    });
+    out.appendChild(tabla.root);
+    out.appendChild(el("p", { className: "hint",
+      text: "Interpretación de los códigos: en el campo Tipo, P = principal y S = secundaria; en Estado, A = activa e I = inactiva. La API devuelve únicamente la letra, que se muestra entre paréntesis." }));
+  }
+
+  out.appendChild(bloqueCrudo(d));
+}
+
+
+/* ========================================================================= */
+/* == § 11 · MÓDULO 2 — TIPO DE CAMBIO DEL DÓLAR =========================== */
+/* ========================================================================= */
+
+/* --- 11.1 Tipo de cambio vigente ----------------------------------------- */
+function initTcActual() {
+  $("btn-tc-actual").addEventListener("click", async () => {
+    clearAlert("alert-tcactual");
+    clearNode($("out-tcactual"));
+    setLoading("load-tcactual", "btn-tc-actual", true);
+
+    try {
+      const datos = await apiGet(RUTAS.tcDolar, {});
+      marcarUltimaConsulta();
+      renderTcActual(datos);
+    } catch (err) {
+      mostrarError("alert-tcactual", err);
+    } finally {
+      setLoading("load-tcactual", "btn-tc-actual", false);
+    }
+  });
+}
+
+function renderTcActual(d) {
+  const out = $("out-tcactual");
+  clearNode(out);
+
+  if (!d || typeof d !== "object") {
+    showAlert("alert-tcactual", "warn", MENSAJES_ERROR.vacia.titulo, MENSAJES_ERROR.vacia.texto);
+    return;
+  }
+
+  const compra = d.compra && typeof d.compra === "object" ? d.compra : null;
+  const venta  = d.venta  && typeof d.venta  === "object" ? d.venta  : null;
+
+  if (!compra && !venta) {
+    showAlert("alert-tcactual", "err", MENSAJES_ERROR.formato.titulo, MENSAJES_ERROR.formato.texto);
+    out.appendChild(bloqueCrudo(d, "Respuesta recibida"));
+    return;
+  }
+
+  out.appendChild(encabezadoResultado("Tipo de cambio del dólar estadounidense"));
+
+  const dl = el("div", { className: "dl" });
+
+  dl.appendChild(dlItem("Moneda consultada", "USD — Dólar de los Estados Unidos de América"));
+
+  const fecha = (compra && compra.fecha) || (venta && venta.fecha);
+  if (hasValue(fecha)) {
+    dl.appendChild(dlItem("Fecha de referencia", fmtFecha(fecha), { nota: `Valor original: ${fecha}` }));
+  }
+
+  if (compra && typeof compra.valor === "number") {
+    dl.appendChild(dlItem("Tipo de cambio de COMPRA", `₡ ${fmtNum(compra.valor, 2)}`,
+      { nota: compra.fecha && compra.fecha !== fecha ? `Fecha: ${fmtFecha(compra.fecha)}` : null }));
+  }
+  if (venta && typeof venta.valor === "number") {
+    dl.appendChild(dlItem("Tipo de cambio de VENTA", `₡ ${fmtNum(venta.valor, 2)}`,
+      { nota: venta.fecha && venta.fecha !== fecha ? `Fecha: ${fmtFecha(venta.fecha)}` : null }));
+  }
+
+  if (compra && venta && typeof compra.valor === "number" && typeof venta.valor === "number") {
+    dl.appendChild(dlItem("Diferencial (venta − compra)", `₡ ${fmtNum(venta.valor - compra.valor, 2)}`,
+      { nota: "Cálculo realizado localmente a partir de los valores oficiales." }));
+  }
+
+  dl.appendChild(dlItem("Fuente oficial",
+    "Ministerio de Hacienda de Costa Rica",
+    { full: true, nota: "Servicio de indicadores económicos: api.hacienda.go.cr/indicadores/tc/dolar" }));
+
+  out.appendChild(dl);
+  out.appendChild(bloqueCrudo(d));
+}
+
+/** Fecha de hoy en formato AAAA-MM-DD según la hora local del dispositivo. */
+function hoyISO() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+
+/* ========================================================================= */
+/* == § 12 · MÓDULO 3 — EXONERACIONES  (/fe/ex) ============================ */
+/* ========================================================================= */
+
+const REGEX_AUTORIZACION = /^AL-\d{8}-\d{2}$/;
+
+/**
+ * Normaliza lo escrito por la persona usuaria al formato AL-XXXXXXXX-XX.
+ *
+ * Admite, entre otras: "al-00460853-20", "00460853-20", "0046085320",
+ * "AL 00460853 20".
+ *
+ * La conversión automática sólo se aplica cuando la entrada no contiene un
+ * prefijo alfabético distinto de "AL". Un valor como "XX-00460853-20" NO se
+ * transforma en "AL-00460853-20": se devuelve tal cual para que la validación
+ * lo rechace, de modo que nunca se consulte algo distinto de lo que se escribió.
+ */
+function normalizarAutorizacion(entrada) {
+  const compacto = String(entrada || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (compacto === "") return "";
+
+  // Ya viene con el prefijo y la estructura correctos
+  if (REGEX_AUTORIZACION.test(compacto)) return compacto;
+
+  // Letras presentes en la entrada: deben ser exactamente "AL"
+  const letras = compacto.replace(/[^A-Z]/g, "");
+  if (letras !== "" && letras !== "AL") return compacto;
+
+  const digitos = compacto.replace(/\D/g, "");
+  if (digitos.length === 10) return `AL-${digitos.slice(0, 8)}-${digitos.slice(8)}`;
+
+  return compacto;
+}
+
+function validarAutorizacion(entrada) {
+  const valor = normalizarAutorizacion(entrada);
+  if (valor === "") return { ok: false, mensaje: "Escriba el número de autorización de exoneración." };
+  if (!REGEX_AUTORIZACION.test(valor)) {
+    return {
+      ok: false, valor,
+      mensaje: "El número no cumple el formato AL-XXXXXXXX-XX (las letras AL, ocho dígitos, guion y dos dígitos del año). " +
+               "También puede escribir únicamente los 10 dígitos."
+    };
+  }
+  return { ok: true, valor };
+}
+
+function initExoneracion() {
+  const input = $("in-exoneracion");
+  const preview = $("preview-exoneracion");
+
+  // Vista previa en vivo del valor que se enviará a la API
+  input.addEventListener("input", () => {
+    const v = normalizarAutorizacion(input.value);
+    preview.textContent = v || "—";
+    if (v && REGEX_AUTORIZACION.test(v)) {
+      $("err-exoneracion").textContent = "";
+      input.removeAttribute("aria-invalid");
+    }
+  });
+
+  // Al salir del campo, se completa el formato automáticamente
+  input.addEventListener("blur", () => {
+    const v = normalizarAutorizacion(input.value);
+    if (v && REGEX_AUTORIZACION.test(v)) input.value = v;
+  });
+
+  $("form-exoneracion").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const v = validarAutorizacion(input.value);
+    preview.textContent = v.valor || "—";
+    if (!v.ok) { pintarErrorCampo("err-exoneracion", "in-exoneracion", v.mensaje); return; }
+    pintarErrorCampo("err-exoneracion", "in-exoneracion", "");
+    input.value = v.valor;
+
+    clearAlert("alert-exoneracion");
+    clearNode($("out-exoneracion"));
+    setLoading("load-exoneracion", "btn-exoneracion", true);
+
+    try {
+      const datos = await apiGet(RUTAS.ex, { autorizacion: v.valor });
+      marcarUltimaConsulta();
+      renderExoneracion(datos, v.valor);
+    } catch (err) {
+      if (err?.kind === "not-found" || err?.kind === "sin-resultado") {
+        showAlert("alert-exoneracion", "warn", "Autorización no encontrada",
+          `El Ministerio de Hacienda no tiene registrada la autorización ${v.valor}. ` +
+          "Verifique el número; si es correcto, es posible que la autorización no exista o no esté disponible para consulta pública.");
+      } else if (err?.kind === "bad-request") {
+        showAlert("alert-exoneracion", "warn", "Número de autorización inválido",
+          `El servicio rechazó el valor ${v.valor} por tener un formato no admitido. Revise que corresponda al patrón AL-XXXXXXXX-XX.`);
+      } else {
+        mostrarError("alert-exoneracion", err);
+      }
+    } finally {
+      setLoading("load-exoneracion", "btn-exoneracion", false);
+    }
+  });
+}
+
+/** Etiquetas legibles para los campos observados en /fe/ex. */
+const ETIQUETAS_EX = {
+  numeroDocumento: "Número de documento",
+  identificacion: "Identificación del beneficiario",
+  codigoProyectoCFIA: "Código de proyecto CFIA",
+  porcentajeExoneracion: "Porcentaje de exoneración",
+  autorizacion: "Número de autorización",
+  fechaEmision: "Fecha de emisión",
+  fechaVencimiento: "Fecha de vencimiento",
+  ano: "Año",
+  cabys: "Códigos CABYS cubiertos",
+  tipoAutorizacion: "Tipo de autorización",
+  tipoDocumento: "Tipo de documento",
+  CodigoInstitucion: "Código de la institución",
+  nombreInstitucion: "Institución emisora",
+  poseeCabys: "Incluye códigos CABYS",
+  codigo: "Código",
+  descripcion: "Descripción"
+};
+
+function renderExoneracion(d, autorizacion) {
+  const out = $("out-exoneracion");
+  clearNode(out);
+
+  if (!d || typeof d !== "object" || Object.keys(d).length === 0) {
+    showAlert("alert-exoneracion", "warn", MENSAJES_ERROR.vacia.titulo, MENSAJES_ERROR.vacia.texto);
+    return;
+  }
+
+  out.appendChild(encabezadoResultado("Autorización de exoneración"));
+
+  const dl = el("div", { className: "dl" });
+
+  dl.appendChild(dlItem("Número consultado", autorizacion, { mono: true }));
+
+  if (hasValue(d.numeroDocumento)) dl.appendChild(dlItem(ETIQUETAS_EX.numeroDocumento, d.numeroDocumento, { mono: true }));
+  if (hasValue(d.identificacion))  dl.appendChild(dlItem(ETIQUETAS_EX.identificacion, d.identificacion, { mono: true }));
+
+  if (typeof d.porcentajeExoneracion === "number") {
+    dl.appendChild(dlItem(ETIQUETAS_EX.porcentajeExoneracion, `${fmtNum(d.porcentajeExoneracion)} %`));
+  }
+
+  if (hasValue(d.tipoAutorizacion)) dl.appendChild(dlItem(ETIQUETAS_EX.tipoAutorizacion, d.tipoAutorizacion));
+
+  if (d.tipoDocumento && typeof d.tipoDocumento === "object") {
+    const td = d.tipoDocumento;
+    dl.appendChild(dlItem(ETIQUETAS_EX.tipoDocumento,
+      hasValue(td.descripcion) ? td.descripcion : "—",
+      { nota: hasValue(td.codigo) ? `Código: ${td.codigo}` : null, full: true }));
+  }
+
+  if (hasValue(d.nombreInstitucion)) {
+    dl.appendChild(dlItem(ETIQUETAS_EX.nombreInstitucion, d.nombreInstitucion,
+      { nota: hasValue(d.CodigoInstitucion) ? `Código: ${d.CodigoInstitucion}` : null }));
+  }
+
+  if (hasValue(d.fechaEmision))     dl.appendChild(dlItem(ETIQUETAS_EX.fechaEmision, fmtFecha(d.fechaEmision)));
+
+  // Vigencia: se calcula localmente comparando con la fecha del dispositivo
+  if (hasValue(d.fechaVencimiento)) {
+    const iso = isoDatePart(d.fechaVencimiento);
+    const vencida = iso ? iso < hoyISO() : null;
+    dl.appendChild(dlItem(ETIQUETAS_EX.fechaVencimiento, fmtFecha(d.fechaVencimiento),
+      { nota: vencida === null ? null
+            : vencida ? "Según la fecha de su dispositivo, la autorización ya venció."
+                      : "Según la fecha de su dispositivo, la autorización sigue vigente." }));
+    if (vencida !== null) {
+      dl.appendChild(dlItem("Vigencia (cálculo local)", vencida ? "Vencida" : "Vigente",
+        { badge: vencida ? "err" : "ok",
+          nota: "Cálculo realizado por esta aplicación; no proviene de la API." }));
+    }
+  }
+
+  if (d.ano !== undefined && d.ano !== null && d.ano !== "") dl.appendChild(dlItem(ETIQUETAS_EX.ano, d.ano));
+
+  if (d.codigoProyectoCFIA !== undefined && d.codigoProyectoCFIA !== null) {
+    dl.appendChild(dlItem(ETIQUETAS_EX.codigoProyectoCFIA, d.codigoProyectoCFIA,
+      { mono: true, nota: d.codigoProyectoCFIA === 0 ? "Sin proyecto CFIA asociado." : null }));
+  }
+
+  if (typeof d.autorizacion === "number") {
+    dl.appendChild(dlItem("Consecutivo de autorización", fmtNum(d.autorizacion), { mono: true }));
+  }
+
+  if (typeof d.poseeCabys === "boolean") {
+    dl.appendChild(dlItem(ETIQUETAS_EX.poseeCabys, d.poseeCabys ? "Sí" : "No",
+      { badge: d.poseeCabys ? "ok" : "neutral" }));
+  }
+
+  out.appendChild(dl);
+
+  // --- Códigos CABYS cubiertos ------------------------------------------
+  if (Array.isArray(d.cabys) && d.cabys.length > 0) {
+    out.appendChild(el("h4", { className: "subhead", text: "📦 Códigos CABYS cubiertos por la autorización" }));
+    const filas = d.cabys.map((c) => ({ codigo: typeof c === "object" ? JSON.stringify(c) : String(c) }));
+    const tabla = new DataTable({
+      columns: [{ key: "codigo", label: "Código CABYS", mono: true }],
+      rows: filas,
+      pageSize: 25,
+      csvName: `cabys_exoneracion_${autorizacion}`,
+      copyKey: "codigo"
+    });
+    out.appendChild(tabla.root);
+  }
+
+  // Campos adicionales no contemplados explícitamente arriba
+  const yaMostrados = new Set(["numeroDocumento","identificacion","codigoProyectoCFIA","porcentajeExoneracion",
+    "autorizacion","fechaEmision","fechaVencimiento","ano","cabys","tipoAutorizacion","tipoDocumento",
+    "CodigoInstitucion","nombreInstitucion","poseeCabys"]);
+  const extra = {};
+  for (const [k, v] of Object.entries(d)) if (!yaMostrados.has(k) && hasValue(v)) extra[k] = v;
+  if (Object.keys(extra).length > 0) {
+    out.appendChild(el("h4", { className: "subhead", text: "📌 Otros datos devueltos por el servicio" }));
+    out.appendChild(renderObjetoGenerico(extra, ETIQUETAS_EX));
+  }
+
+  out.appendChild(bloqueCrudo(d));
+
+  showAlert("alert-exoneracion", "ok", "Autorización encontrada",
+    "La información proviene del Ministerio de Hacienda de Costa Rica.");
+}
+
+
+/* ========================================================================= */
+/* == § 13 · MÓDULO 4 — PRODUCTORES AGROPECUARIOS  (/fe/agropecuario) ====== */
+/* ========================================================================= */
+
+/**
+ * Etiquetas legibles para los campos del registro agropecuario.
+ * El esquema completo no está publicado en la documentación oficial y en las
+ * pruebas realizadas el servicio devolvió "no encontrado" para todas las
+ * identificaciones probadas, por lo que el detalle se muestra de forma
+ * genérica: se listan los campos que efectivamente lleguen, con una etiqueta
+ * derivada del nombre de la propiedad. No se inventa ningún campo.
+ */
+const ETIQUETAS_REGISTRO = {
+  identificacion: "Identificación",
+  tipoIdentificacion: "Tipo de identificación",
+  nombre: "Nombre o razón social",
+  nombreProductor: "Nombre de la persona productora",
+  productor: "Persona productora",
+  estado: "Condición encontrada",
+  condicion: "Condición encontrada",
+  activo: "Activo",
+  fechaBaja: "Fecha de baja",
+  institucion: "Institución o registro relacionado",
+  fuenteDatos: "Fuente de los datos",
+  tipoRegistro: "Tipo de registro",
+  registro: "Registro",
+  autorizacion: "Número de autorización",
+  actividad: "Actividad registrada",
+  categoria: "Categoría registrada",
+  tipoPYMPA: "Tipo PYMPA",
+  tipo: "Tipo",
+  fecha: "Fecha",
+  fechaRegistro: "Fecha de registro",
+  fechaEmision: "Fecha de emisión",
+  fechaVencimiento: "Fecha de vencimiento",
+  vence: "Vence",
+  vigente: "Vigente",
+  descripcion: "Descripción",
+  codigo: "Código",
+  direccionRegional: "Dirección regional",
+  agenciaExtension: "Agencia de extensión",
+  provincia: "Provincia",
+  canton: "Cantón",
+  distrito: "Distrito"
+};
+
+/**
+ * Fábrica compartida por los módulos "agropecuario" y "pesca": ambos reciben
+ * una identificación, consultan su endpoint y presentan los campos devueltos.
+ */
+function crearModuloRegistro(cfg) {
+  $(cfg.formId).addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const v = validarIdentificacion($(cfg.inputId).value);
+    if (!v.ok) { pintarErrorCampo(cfg.errId, cfg.inputId, v.mensaje); return; }
+    pintarErrorCampo(cfg.errId, cfg.inputId, "");
+
+    clearAlert(cfg.alertId);
+    clearNode($(cfg.outId));
+    setLoading(cfg.loaderId, cfg.buttonId, true);
+
+    try {
+      const datos = await apiGet(cfg.ruta, { identificacion: v.valor });
+      marcarUltimaConsulta();
+      renderRegistro(cfg, datos, v.valor);
+    } catch (err) {
+      if (err?.kind === "not-found" || err?.kind === "sin-resultado") {
+        // Redacción prudente: la ausencia de datos no equivale a una negación oficial
+        showAlert(cfg.alertId, "warn", cfg.tituloNoEncontrado,
+          `El servicio del Ministerio de Hacienda no devolvió información para la identificación ${v.valor}. ` +
+          cfg.textoNoEncontrado, null, cfg.portal);
+      } else {
+        mostrarError(cfg.alertId, err);
+      }
+    } finally {
+      setLoading(cfg.loaderId, cfg.buttonId, false);
+    }
+  });
+}
+
+function renderRegistro(cfg, datos, identificacion) {
+  const out = $(cfg.outId);
+  clearNode(out);
+
+  // Respuesta vacía o sin contenido útil: no se afirma nada
+  const vacio = !datos
+    || (Array.isArray(datos) && datos.length === 0)
+    || (typeof datos === "object" && !Array.isArray(datos) && Object.keys(datos).length === 0);
+
+  if (vacio) {
+    showAlert(cfg.alertId, "warn", cfg.tituloNoEncontrado,
+      `El servicio respondió sin datos para la identificación ${identificacion}. ` + cfg.textoNoEncontrado,
+      null, cfg.portal);
+    return;
+  }
+
+  out.appendChild(encabezadoResultado(cfg.tituloResultado));
+
+  const cabecera = el("div", { className: "dl" });
+  cabecera.appendChild(dlItem("Identificación consultada", identificacion, { mono: true }));
+  cabecera.appendChild(dlItem("Resultado de la consulta", "Registro encontrado", { badge: "ok" }));
+  cabecera.appendChild(dlItem("Institución o registro relacionado", cfg.institucion, { full: true }));
+  out.appendChild(cabecera);
+
+  out.appendChild(el("h4", { className: "subhead", text: "📋 Datos devueltos por el servicio" }));
+
+  if (Array.isArray(datos)) {
+    const objetos = datos.filter((x) => x && typeof x === "object" && !Array.isArray(x));
+    if (objetos.length === datos.length && datos.length > 0) {
+      const claves = [...new Set(datos.flatMap((o) => Object.keys(o)))];
+      const tabla = new DataTable({
+        columns: claves.map((k) => ({
+          key: k,
+          label: ETIQUETAS_REGISTRO[k] || humanizeKey(k),
+          mono: /codigo|identificacion/i.test(k),
+          format: (v) => {
+            if (v === null || v === undefined) return "";
+            if (typeof v === "boolean") return v ? "Sí" : "No";
+            if (typeof v === "object") return JSON.stringify(v);
+            if (typeof v === "string" && isoDatePart(v)) return fmtFecha(v);
+            return v;
+          }
+        })),
+        rows: datos,
+        pageSize: 25,
+        csvName: `${cfg.csvBase}_${identificacion}`
+      });
+      out.appendChild(tabla.root);
+    } else {
+      out.appendChild(el("pre", { className: "raw", text: JSON.stringify(datos, null, 2) }));
+    }
+  } else {
+    out.appendChild(renderObjetoGenerico(datos, ETIQUETAS_REGISTRO));
+  }
+
+  out.appendChild(el("p", { className: "hint",
+    text: "Las etiquetas mostradas se derivan de los nombres de los campos devueltos por la API oficial. " +
+          "Esta aplicación no agrega, completa ni interpreta información que el servicio no haya suministrado." }));
+
+  out.appendChild(bloqueCrudo(datos));
+
+  showAlert(cfg.alertId, "ok", "Registro encontrado",
+    "La información proviene del Ministerio de Hacienda de Costa Rica.");
+}
+
+function initAgro() {
+  crearModuloRegistro({
+    formId: "form-agro", inputId: "in-agro", errId: "err-agro",
+    alertId: "alert-agro", outId: "out-agro",
+    loaderId: "load-agro", buttonId: "btn-agro",
+    ruta: RUTAS.agropecuario,
+    csvBase: "agropecuario",
+    portal: PORTALES_OFICIALES.magProductor,
+    institucion: "Ministerio de Agricultura y Ganadería (MAG) — registro de productores agropecuarios",
+    tituloResultado: "Registro de productor agropecuario",
+    tituloNoEncontrado: "No figura en el registro consultado",
+    textoNoEncontrado:
+      "Esto significa que no aparece registrada como productor agropecuario del MAG en la información que " +
+      "publica el Ministerio de Hacienda. Verifique el número de identificación; la ausencia de datos no " +
+      "constituye por sí sola una certificación oficial."
+  });
+}
+
+
+/* ========================================================================= */
+/* == § 14 · MÓDULO 5 — REGISTRO PESQUERO  (/fe/pesca) ===================== */
+/* ========================================================================= */
+
+function initPesca() {
+  crearModuloRegistro({
+    formId: "form-pesca", inputId: "in-pesca", errId: "err-pesca",
+    alertId: "alert-pesca", outId: "out-pesca",
+    loaderId: "load-pesca", buttonId: "btn-pesca",
+    ruta: RUTAS.pesca,
+    csvBase: "pesca",
+    portal: PORTALES_OFICIALES.incopesca,
+    institucion: "Instituto Costarricense de Pesca y Acuicultura (INCOPESCA) — productores, pescadores y acuicultores",
+    tituloResultado: "Registro pesquero y acuícola",
+    tituloNoEncontrado: "No figura en el registro consultado",
+    textoNoEncontrado:
+      "Esto significa que no aparece vinculada a actividades pesqueras o acuícolas en la información que " +
+      "publica el Ministerio de Hacienda. Verifique el número de identificación; la ausencia de datos no " +
+      "constituye por sí sola una certificación oficial."
+  });
+}
+
+
+/* ========================================================================= */
+/* == § 15 · MÓDULO 6 — CATÁLOGO CABYS  (/fe/cabys) ======================== */
+/* ========================================================================= */
+
+/** Alterna los campos visibles según la modalidad de búsqueda elegida. */
+function sincronizarModoCabys() {
+  const modo = document.querySelector('input[name="cabys-modo"]:checked')?.value || "codigo";
+  $("wrap-cabys-codigo").hidden = modo !== "codigo";
+  $("wrap-cabys-q").hidden      = modo !== "descripcion";
+  $("wrap-cabys-top").hidden    = modo !== "descripcion";
+  $("err-cabys").textContent = "";
+}
+
+function validarCabysCodigo(entrada) {
+  const v = String(entrada || "").trim().replace(/[\s\-.]/g, "");
+  if (v === "") return { ok: false, mensaje: "Escriba el código CABYS." };
+  if (!/^\d+$/.test(v)) return { ok: false, mensaje: "El código CABYS debe contener únicamente números." };
+  if (v.length !== 13) return { ok: false, mensaje: `El código CABYS debe tener exactamente 13 dígitos; escribió ${v.length}.` };
+  return { ok: true, valor: v };
+}
+
+function validarCabysDescripcion(entrada) {
+  const v = String(entrada || "").trim().replace(/\s+/g, " ");
+  if (v.length < 3) return { ok: false, mensaje: "Escriba al menos 3 caracteres para buscar por descripción." };
+  return { ok: true, valor: v };
+}
+
+function initCabys() {
+  document.querySelectorAll('input[name="cabys-modo"]').forEach((r) => {
+    r.addEventListener("change", () => {
+      sincronizarModoCabys();
+      const foco = r.value === "codigo" ? $("in-cabys-codigo") : $("in-cabys-q");
+      foco.focus();
+    });
+  });
+  sincronizarModoCabys();
+
+  $("form-cabys").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const modo = document.querySelector('input[name="cabys-modo"]:checked')?.value || "codigo";
+    let params, descripcionConsulta, csvBase;
+
+    if (modo === "codigo") {
+      const v = validarCabysCodigo($("in-cabys-codigo").value);
+      if (!v.ok) { pintarErrorCampo("err-cabys", "in-cabys-codigo", v.mensaje); return; }
+      $("in-cabys-codigo").removeAttribute("aria-invalid");
+      $("err-cabys").textContent = "";
+      params = { codigo: v.valor };
+      descripcionConsulta = `Código ${v.valor}`;
+      csvBase = `cabys_${v.valor}`;
+    } else {
+      const v = validarCabysDescripcion($("in-cabys-q").value);
+      if (!v.ok) { pintarErrorCampo("err-cabys", "in-cabys-q", v.mensaje); return; }
+      $("in-cabys-q").removeAttribute("aria-invalid");
+      $("err-cabys").textContent = "";
+      const top = parseInt($("in-cabys-top").value, 10) || 25;
+      params = { q: v.valor, top };
+      descripcionConsulta = `Descripción «${v.valor}» (máximo ${top} resultados)`;
+      csvBase = "cabys_busqueda";
+    }
+
+    clearAlert("alert-cabys");
+    clearNode($("out-cabys"));
+    setLoading("load-cabys", "btn-cabys", true);
+
+    try {
+      const datos = await apiGet(RUTAS.cabys, params, { timeout: 30000 });
+      marcarUltimaConsulta();
+      renderCabys(datos, descripcionConsulta, csvBase, modo);
+    } catch (err) {
+      if (err?.kind === "not-found" || err?.kind === "sin-resultado") {
+        showAlert("alert-cabys", "warn", "Sin coincidencias",
+          "El catálogo CABYS no devolvió resultados para los criterios indicados. " +
+          (modo === "codigo"
+            ? "Verifique que el código de 13 dígitos sea correcto."
+            : "Pruebe con otras palabras o con un término más general."));
+      } else {
+        mostrarError("alert-cabys", err);
+      }
+    } finally {
+      setLoading("load-cabys", "btn-cabys", false);
+    }
+  });
+}
+
+/**
+ * Extrae la lista de bienes o servicios de la respuesta.
+ * Formas verificadas contra la API oficial:
+ *   · Búsqueda por código      → arreglo directo:            [ {...} ]
+ *   · Búsqueda por descripción → { total, cantidad, cabys:[ {...} ] }
+ * @returns {{items:Array, total:number|null, cantidad:number|null}|null}
+ */
+function extraerCabys(datos) {
+  if (Array.isArray(datos)) return { items: datos, total: datos.length, cantidad: datos.length };
+  if (datos && typeof datos === "object") {
+    if (Array.isArray(datos.cabys)) {
+      return {
+        items: datos.cabys,
+        total: typeof datos.total === "number" ? datos.total : null,
+        cantidad: typeof datos.cantidad === "number" ? datos.cantidad : datos.cabys.length
+      };
+    }
+    // Cualquier otro objeto con un único arreglo interno
+    const arrays = Object.entries(datos).filter(([, v]) => Array.isArray(v));
+    if (arrays.length === 1) {
+      const items = arrays[0][1];
+      return { items, total: items.length, cantidad: items.length };
+    }
+  }
+  return null;
+}
+
+function renderCabys(datos, descripcionConsulta, csvBase, modo) {
+  const out = $("out-cabys");
+  clearNode(out);
+
+  const extraido = extraerCabys(datos);
+
+  if (!extraido) {
+    showAlert("alert-cabys", "err", MENSAJES_ERROR.formato.titulo, MENSAJES_ERROR.formato.texto);
+    out.appendChild(el("pre", { className: "raw", text: JSON.stringify(datos, null, 2) }));
+    return;
+  }
+
+  if (extraido.items.length === 0) {
+    showAlert("alert-cabys", "warn", "Sin coincidencias",
+      "El catálogo CABYS no contiene registros que coincidan con los criterios indicados. " +
+      (modo === "codigo"
+        ? "Verifique que el código de 13 dígitos sea correcto."
+        : "Pruebe con otras palabras o con un término más general."));
+    return;
+  }
+
+  out.appendChild(encabezadoResultado("Resultados del catálogo CABYS",
+    `${descripcionConsulta} · Consultado el ${nowLabel()}`));
+
+  // Aviso cuando el catálogo tiene más coincidencias de las devueltas
+  if (extraido.total !== null && extraido.cantidad !== null && extraido.total > extraido.cantidad) {
+    showAlert("alert-cabys", "info", "Resultados parciales",
+      `El catálogo encontró ${fmtNum(extraido.total)} coincidencias y el servicio devolvió ${fmtNum(extraido.cantidad)}. ` +
+      "Aumente el máximo de resultados o precise la descripción para acotar la búsqueda.");
+  } else {
+    showAlert("alert-cabys", "ok", "Búsqueda realizada",
+      `Se obtuvieron ${extraido.items.length} registro${extraido.items.length === 1 ? "" : "s"} del catálogo oficial.`);
+  }
+
+  // Filas normalizadas de forma defensiva: cada campo puede faltar
+  const filas = extraido.items.map((it) => {
+    const cats = Array.isArray(it?.categorias) ? it.categorias.filter((c) => hasValue(c)) : [];
+    return {
+      codigo: hasValue(it?.codigo) ? String(it.codigo) : "",
+      descripcion: hasValue(it?.descripcion) ? String(it.descripcion) : "",
+      impuesto: (typeof it?.impuesto === "number") ? it.impuesto
+              : (hasValue(it?.impuesto) ? Number(it.impuesto) : null),
+      categoria: cats.length ? String(cats[0]) : "",
+      detalle: cats.length ? cats.join(" › ") : "",
+      estado: hasValue(it?.estado) ? String(it.estado) : "",
+      _origen: it
+    };
+  });
+
+  const columnas = [
+    { key: "codigo", label: "Código CABYS", mono: true },
+    { key: "descripcion", label: "Descripción del bien o servicio" },
+    { key: "impuesto", label: "IVA", align: "right",
+      format: (v) => (typeof v === "number" && isFinite(v)) ? `${fmtNum(v)} %` : "",
+      csv: (v) => (typeof v === "number" && isFinite(v)) ? v : "",
+      sortValue: (r) => (typeof r.impuesto === "number" ? r.impuesto : -1) },
+    { key: "categoria", label: "Categoría principal" }
+  ];
+
+  // Sólo se agregan columnas si la API realmente devolvió esos datos
+  if (filas.some((f) => f.detalle)) {
+    columnas.push({ key: "detalle", label: "Clasificación completa" });
+  }
+  if (filas.some((f) => f.estado)) {
+    columnas.push({ key: "estado", label: "Estado" });
+  }
+
+  const tabla = new DataTable({
+    columns: columnas,
+    rows: filas,
+    pageSize: 10,
+    csvName: csvBase,
+    copyKey: "codigo",
+    emptyText: "Ningún registro coincide con el filtro escrito."
+  });
+  out.appendChild(tabla.root);
+
+  out.appendChild(el("p", { className: "hint",
+    text: "El porcentaje de IVA corresponde al campo «impuesto» devuelto por la API. La clasificación completa " +
+          "muestra la jerarquía de categorías del catálogo, de lo general a lo específico." }));
+
+  out.appendChild(bloqueCrudo(datos));
+}
+
+
+/* ========================================================================= */
+/* == § 16 · ARRANQUE ====================================================== */
+/* ========================================================================= */
+
+function init() {
+  loadPrefs();
+  initTheme();
+  initTabs();
+  initNetworkStatus();
+  initBotonesComunes();
+  initConfig();
+
+  initTributaria();
+  initTcActual();
+  initExoneracion();
+  initAgro();
+  initPesca();
+  initCabys();
+
+  updateCacheCount();
+
+  console.info(
+    "%cVerificador Hacienda CR",
+    "font-weight:bold;font-size:14px;color:#2b4a8f",
+    "\nFuente de datos: API pública del Ministerio de Hacienda de Costa Rica (https://api.hacienda.go.cr/docs)." +
+    "\nLos detalles técnicos de cada error se registran en esta consola." +
+    "\nLímite aplicado por la aplicación: máx. 2 solicitudes simultáneas y una cada 200 ms."
+  );
+}
+
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+else init();
+</script>
+</body>
+</html>

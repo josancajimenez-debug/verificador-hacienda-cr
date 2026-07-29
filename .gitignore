@@ -1,0 +1,14 @@
+# Materiales de trabajo que no forman parte de la aplicación publicada
+PROMT VERIFICADOR.docx
+BIBLIOGRAFÍA/
+*.docx
+
+# Paquete comprimido: se regenera; no conviene versionarlo
+verificador-hacienda-cr.zip
+
+# Archivos temporales
+*.tmp
+*.log
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,476 @@
+# Evidencia de pruebas — Verificador Hacienda CR
+
+Fecha de ejecución: **29 de julio de 2026**
+Entorno: Windows 11 Pro · Node.js v24.18.0 · Google Chrome (Playwright 1.62)
+API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos simulados)
+
+| Banco de pruebas | Casos | Correctos | Fallidos |
+|---|---:|---:|---:|
+| 1 · Lógica pura | 60 | 60 | 0 |
+| 2 · Integración con la API oficial | 16 | 16 | 0 |
+| 3 · Navegador real (Chrome) | 46 | 46 | 0 |
+| **Total** | **122** | **122** | **0** |
+
+Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
+
+---
+
+## 0. Verificación previa de los endpoints
+
+Antes de escribir la aplicación se comprobó cada endpoint con `curl`, para no asumir ningún campo ni comportamiento.
+
+| Endpoint | Estado | Observación |
+|---|---|---|
+| `/fe/ae` | Operativo | `Access-Control-Allow-Origin: *` en respuestas 200 |
+| `/indicadores/tc/dolar` | Operativo | Objeto con `compra` y `venta` |
+| `/indicadores/tc/dolar/historico` | **503** | Indisponible en todas las variantes probadas |
+| `/fe/ex` | Operativo | Acepta el número en minúsculas |
+| `/fe/agropecuario` | Operativo | Devuelve **HTTP 200** con cuerpo de error 404 |
+| `/fe/pesca` | Operativo | Igual comportamiento que el anterior |
+| `/fe/cabys?codigo=` | Operativo | Devuelve un arreglo; `[]` si no existe |
+| `/fe/cabys?q=&top=` | Operativo | Devuelve `{total, cantidad, cabys[]}` |
+
+### Hallazgo determinante para la arquitectura: CORS parcial
+
+Respuesta correcta — **incluye** cabecera CORS:
+
+```
+$ curl -s -D - -H "Origin: https://example.com" \
+    "https://api.hacienda.go.cr/fe/ae?identificacion=4000042139" | head -4
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: *
+X-Origin-App: api.hacienda.go.cr
+X-Origin-Route: GET /fe/ae
+```
+
+Respuesta 404 — **no** incluye cabecera CORS:
+
+```
+$ curl -s -D - -H "Origin: https://example.com" \
+    "https://api.hacienda.go.cr/fe/ae?identificacion=3101002949" | head -6
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+ETag: "80b9a95465175ba8c640d13b727f7fec:1759165994.760751"
+Server: AkamaiNetStorage
+Cache-Control: max-age=0, no-cache, no-store
+                          ← sin Access-Control-Allow-Origin
+```
+
+Conclusión: se entrega un `index.html` autónomo (CORS habilitado en respuestas 200) y se resuelve el caso 400/404 mediante una sonda de conectividad. Detalle en `README.md`, sección 4.
+
+### Comprobación del histórico (503)
+
+```
+$ curl -s "…/historico?d=2026-07-20&h=2026-07-22"   → {"code":503,"status":"Service unavailable"}
+$ curl -s "…/historico?d=2025-01-01&h=2025-01-05"   → {"code":503,"status":"Service unavailable"}
+$ curl -s "…/historico?d=2024-01-01&h=2024-01-31"   → {"code":503,"status":"Service unavailable"}
+$ curl -s "…/historico?d=2026-07-28&h=2026-07-28"   → {"code":503,"status":"Service unavailable"}
+$ curl -s "…/historico?d=01/07/2026&h=10/07/2026"   → {"code":503,"status":"Service unavailable"}
+$ curl -s "…/historico"                             → {"code":400,"status":"Bad request"}
+```
+
+El 400 sin parámetros confirma que `d` y `h` se reconocen: la indisponibilidad está en el servicio de origen, no en la construcción de la petición.
+
+---
+
+## 0 bis. Investigación de fuentes complementarias
+
+Se evaluaron dos portales institucionales para intentar resolver las dos limitaciones detectadas: la indisponibilidad del histórico de tipo de cambio y la ausencia de un caso positivo en los registros agropecuario y pesquero.
+
+### Banco Central de Costa Rica — histórico de tipo de cambio
+
+Punto de partida: <https://www.bccr.fi.cr/SitePages/Inicio.aspx>
+
+**Primero se descartó que el fallo fuese de esta aplicación.** Se repitió el ejemplo publicado en la propia documentación del Ministerio y varias variantes de ruta y parámetros:
+
+```
+/indicadores/tc/dolar/historico?d=2019-12-01&h=2019-12-09   → 503   (ejemplo oficial)
+/indicadores/tc/dolar/historico/?d=2019-12-01&h=2019-12-09  → 503
+/indicadores/tc/dolar/Historico?d=2019-12-01&h=2019-12-09   → 503
+/indicadores/tc/dolar/historico?D=2019-12-01&H=2019-12-09   → 400   (parámetros en mayúscula)
+/indicadores/tc/historico?d=2019-12-01&h=2019-12-09         → 404   (ruta inexistente)
+/indicadores/historico/tc/dolar?d=2019-12-01&h=2019-12-09   → 404   (ruta inexistente)
+```
+
+La ruta existe (503, no 404) y los parámetros en minúscula se reconocen (los de mayúscula dan 400). **El fallo está en el servidor del Ministerio.** También se comprobó que el recurso diario no admite fecha: `/indicadores/tc/dolar?fecha=2026-07-20`, `?d=`, `?f=` y `?date=` devuelven siempre el tipo de cambio del día en curso, por lo que no es posible reconstruir la serie día a día.
+
+**Evaluación de los dos servicios del BCCR:**
+
+| Servicio | Resultado |
+|---|---|
+| SOAP `gee.bccr.fi.cr/…/wsindicadoreseconomicos.asmx?WSDL` | **HTTP 503**, sin cabeceras CORS |
+| SOAP `ObtenerIndicadoresEconomicosXML` con nombres de parámetro correctos | **HTTP 503** |
+| Requisitos de acceso del SOAP | Nombre, correo y **token de suscripción personal** en cada llamada |
+| REST `apim.bccr.fi.cr/SDDE/api/…/ObtenerDatosCuadro` | **HTTP 200 en el navegador**, 500 desde fuera |
+
+El servicio REST se localizó capturando el tráfico del portal de indicadores del BCCR con un navegador real. Devuelve la serie diaria del dólar desde 1983 (`IdGrupoVariable=1`), pero el análisis de sus cabeceras muestra que no es utilizable:
+
+```
+Petición   token_csrf: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…   ← JWT emitido por su propia aplicación
+Respuesta  access-control-allow-origin: https://sdd.bccr.fi.cr ← CORS restringido a su dominio
+           access-control-allow-credentials: true
+```
+
+**Conclusión: ninguno de los dos es viable, por motivos distintos.** El SOAP obligaría a incrustar una credencial personal en una página pública, visible para cualquier visitante. El REST es una **API interna no publicada**, cuyo control de acceso (JWT propio y CORS restringido a su dominio) es deliberado; eludirlo sería frágil, quedaría fuera de lo que el BCCR autoriza y contradice el criterio de no emplear servicios no oficiales.
+
+Se optó por **enlazar, no consumir**: el mensaje de error del histórico abre directamente el cuadro «Tipo cambio de compra y de venta del dólar» del portal del BCCR, que es la pantalla equivalente a este módulo. Verificado en el banco 3.
+
+**Mejora de experiencia derivada del diagnóstico.** Como el servicio falla de forma sostenida, cada intento consumía la solicitud inicial más los reintentos con espera progresiva: varios segundos de indicador de proceso para recibir siempre el mismo mensaje. El módulo ahora recuerda la caída durante 10 minutos y responde de inmediato, ofreciendo un botón «Comprobar de nuevo» que sí vuelve a consultar:
+
+```
+Primer intento   → 503 tras reintentos automáticos   (≈ 7 s)
+Segundo intento  → aviso inmediato                   (23 ms medidos)
+«Comprobar de nuevo» → vuelve a consultar la API realmente
+```
+
+Esto no oculta el fallo ni impide reintentar: en cuanto el Ministerio restablezca el servicio, el módulo funcionará sin ningún cambio en el código.
+
+### Ministerio de Agricultura y Ganadería — registro de productores
+
+Punto de partida: <https://mag.go.cr/servicios-y-tramites/consultaproductor/>
+
+| Vía explorada | Resultado |
+|---|---|
+| `www.mag.go.cr/consulta/Registro-Persona-y-Establecimientos.xlsx` | **HTTP 404** — el enlace está roto en el propio sitio del MAG |
+| Consulta pública `sistemasv2.mag.go.cr/SistemaDNEA/Productores/wf_ConsultaProductor.aspx` | Operativa, pero exige una cédula concreta; con búsqueda vacía responde «Sin datos para mostrar» |
+| Consulta de establecimientos con CVO de SENASA (`sis.senasa.go.cr/establecimiento`) | Protegida con reCAPTCHA Enterprise; no procede eludirla |
+| Portal nacional de datos abiertos | No publica el registro con identificaciones |
+
+**Conclusión: no fue posible obtener un caso positivo.** Sin embargo, la exploración aportó dos resultados de valor, ambos incorporados a la aplicación:
+
+**a) Regla del cero inicial — corrige documentación de terceros.** Listas comunitarias de APIs costarricenses afirman que «para la consulta de identificaciones físicas nacionales es necesario incluir el 0 como primer dígito». La verificación directa demuestra lo contrario, con pares comparados del mismo número:
+
+```
+/fe/ae?identificacion=012345678             → HTTP 400
+/fe/ae?identificacion=112345678             → HTTP 404   (formato aceptado)
+/fe/agropecuario?identificacion=0987654321  → HTTP 400
+/fe/agropecuario?identificacion=1987654321  → HTTP 200   (formato aceptado)
+/fe/pesca?identificacion=098765432          → HTTP 400
+/fe/pesca?identificacion=198765432          → HTTP 200   (formato aceptado)
+```
+
+El cuerpo del 400 es explícito: `{"code":400,"status":"Bad Request, please review your request and try again"}`.
+
+Impacto de la corrección: sin esta comprobación, un usuario que escribiera su cédula con el 0 delante habría recibido «no se encontró información», porque ese 400 llega sin cabeceras CORS y la sonda lo clasifica como registro inexistente. Ahora la aplicación lo detecta antes de enviar la solicitud y explica cómo corregirlo, ahorrando además una llamada inútil a la API.
+
+**b) Nombres de campo del registro único.** La segunda tabla de la herramienta del MAG se titula «Listado de registros en MAG, SFE, SENASA que accede otras entidades (Hacienda, CCSS)» —exactamente la fuente que alimenta `/fe/agropecuario`— y expone estas columnas:
+
+```
+Fuente de Datos | Tipo Registro | Identificación | Tipo Identificación |
+Nombre Productor | # Autorización | Estado | Fecha | Vence
+```
+
+La primera tabla añade: `Fecha Emisión`, `Fecha Vencimiento`, `Dirección Regional`, `Agencia Extensión`, `Tipo PYMPA`.
+
+Estas etiquetas se incorporaron al diccionario `ETIQUETAS_REGISTRO`. El diccionario sólo se aplica a las claves que realmente lleguen en la respuesta: **no crea campos, no los muestra vacíos y no sugiere que existan.**
+
+---
+
+## 1. Banco de lógica pura — 60 casos
+
+Ejercita validadores, normalizadores y clasificadores cargando el script de `index.html` en un contexto aislado. No consume la API.
+
+```
+$ node pruebas/pruebas-logica.js index.html
+
+========================================================================
+  ✓ identificacion   13/13
+  ✓ exoneracion      9/9
+  ✓ fechas           12/12
+  ✓ cabys            7/7
+  ✓ errores          8/8
+  ✓ cabys-parse      5/5
+  ✓ historico        7/7
+  ✓ url              4/4
+  ✓ formato          10/10
+  ✓ catalogos        5/5
+========================================================================
+  TOTAL: 80 pruebas superadas, 0 fallidas
+========================================================================
+```
+
+### Detalle por grupo
+
+**Identificación (13 casos).** Cédula jurídica de 10 dígitos válida · normalización de guiones y espacios (`3-101-012386` → `3101012386`) · cédula física de 9 dígitos · DIMEX de 12 dígitos · rechazo de 8 dígitos · rechazo de 13 dígitos · rechazo de letras · rechazo de cadena vacía · rechazo de espacios en blanco · **rechazo de cédula física con 0 inicial** · **el mensaje del 0 inicial es explicativo** · **rechazo de cédula jurídica con 0 inicial** · **aceptación de la misma cédula sin el 0**.
+
+**Autorización de exoneración (9 casos).** Conversión automática de 10 dígitos a `AL-XXXXXXXX-XX` · conversión desde minúsculas · admisión de separadores libres (`AL 00460853 20`) · admisión sin prefijo (`00460853-20`) · validación del formato correcto · rechazo de siete dígitos en el bloque central · **rechazo de prefijo distinto de AL** · rechazo de cadena vacía · rechazo de texto arbitrario.
+
+**Rango de fechas (12 casos).** Fecha real del calendario · rechazo del 31 de febrero · rechazo del mes 13 · rechazo del formato `dd/mm/aaaa` · aceptación de `2024-02-29` (bisiesto) · rechazo de `2026-02-29` · rango válido de 10 días · rechazo de inicial posterior a final · rechazo de fecha futura · rechazo de rango superior a 366 días · aceptación de un solo día · rechazo de fechas faltantes.
+
+**CABYS (7 casos).** Código de 13 dígitos válido · rechazo de 12 y de 14 dígitos · rechazo de letras · descripción de 3 caracteres válida · rechazo de 2 caracteres · normalización de espacios múltiples.
+
+**Clasificación de errores incrustados en HTTP 200 (8 casos).** Detecta el cuerpo RFC 7231 de `/fe/agropecuario` · detecta `{code:404,status:"Information no available…"}` · detecta 400, 429 y 503 · **no** marca como error una respuesta válida de `/fe/ae` · **no** marca como error el tipo de cambio · ignora arreglos, como los que devuelve CABYS por código.
+
+**Análisis de la respuesta CABYS (5 casos).** Arreglo directo · objeto `{total,cantidad,cabys}` · conservación del total informado · arreglo vacío · estructura no reconocida devuelve `null`.
+
+**Normalizador del histórico (7 casos).** Arreglo de objetos planos → tabla · ordenación por la columna de fecha detectada · combinación de series `compra`/`venta` por fecha · objeto contenedor con un único arreglo · estructura irreconocible se muestra en crudo · arreglo vacío en crudo · `null` en crudo.
+
+**Construcción de URL (4 casos).** Sin parámetros · con un parámetro · omisión de parámetros vacíos · codificación de espacios.
+
+**Formato (10 casos).** Fecha ISO con hora sin desfase de zona (`2020-12-15T00:00:00` → «15 de diciembre de 2020») · fecha ISO simple · valor no fecha intacto · extracción de la parte `AAAA-MM-DD` · humanización de camelCase y snake_case · `hasValue` con cadena vacía, arreglo vacío, cero y `null`.
+
+**Catálogos (5 casos).** Tipos de identificación 01 y 02 · rutas oficiales de `/fe/ae` y del histórico · origen `https://api.hacienda.go.cr`.
+
+### Defectos encontrados y corregidos en esta fase
+
+1. **Conversión excesiva del número de autorización.** `normalizarAutorizacion("XX-00460853-20")` producía `AL-00460853-20`: extraía los dígitos e imponía el prefijo `AL`, de modo que se habría consultado algo distinto de lo escrito. Corregido: la conversión automática sólo se aplica cuando la entrada no contiene un prefijo alfabético distinto de `AL`; en caso contrario el valor se devuelve intacto para que la validación lo rechace.
+2. **Etiquetas generadas con mayúsculas intermedias.** `humanizeKey("fechaVencimiento")` devolvía «Fecha Vencimiento». Corregido a «Fecha vencimiento», acorde con la ortografía española.
+
+---
+
+## 2. Banco de integración con la API oficial — 16 casos
+
+Ejercita la capa HTTP completa (`apiGet`: caché, deduplicación, limitador de ritmo, reintentos y clasificación de errores) contra los servicios reales.
+
+```
+$ node pruebas/pruebas-api.js index.html
+
+PRUEBAS DE INTEGRACIÓN CONTRA api.hacienda.go.cr
+====================================================================================
+✓ M1 /fe/ae · contribuyente existente (4000042139)            343 ms
+    nombre="INSTITUTO COSTARRICENSE DE ELECTRICIDAD", régimen="Régimen general", actividades=3
+✓ M1 /fe/ae · contribuyente desinscrito con mensaje oficial   291 ms
+    estado="Desinscrito oficio", mensaje presente=true
+✓ M1 /fe/ae · identificación inexistente → not-found          266 ms   kind="not-found", HTTP 404
+✓ M1 /fe/ae · parámetro ausente → bad-request               16781 ms   kind="bad-request", HTTP 400
+✓ M1 /fe/ae · identificación con 0 inicial → bad-request      326 ms   kind="bad-request", HTTP 400
+    regla verificada; la aplicación la bloquea antes de llegar a la red
+✓ M2 /indicadores/tc/dolar · tipo de cambio vigente           286 ms
+    fecha=2026-07-29, compra=449.94, venta=454.55
+✓ M2 · caché: segunda llamada idéntica no genera tráfico        0 ms
+    resuelta desde la caché en memoria
+✓ M2 /indicadores/tc/dolar/historico · rango válido          1691 ms
+    503 del servicio oficial, clasificado como "server" — comportamiento correcto
+✓ M3 /fe/ex · autorización válida (AL-00460853-20)            371 ms
+    doc=AL-00460853-20, exoneración=13%, institución="Ministerio de Hacienda"
+✓ M3 /fe/ex · autorización inexistente → not-found           1192 ms   kind="not-found", HTTP 404
+✓ M3 /fe/ex · formato rechazado por la API → bad-request      309 ms   kind="bad-request", HTTP 400
+✓ M4 /fe/agropecuario · HTTP 200 con cuerpo 404 → not-found   180 ms
+    error incrustado detectado pese al HTTP 200
+✓ M5 /fe/pesca · HTTP 200 con cuerpo 404 → not-found          212 ms
+    error incrustado detectado pese al HTTP 200
+✓ M6 /fe/cabys · búsqueda por código (2132100000100)          203 ms
+    descripción="Jugo de tomate concentrado", IVA=13%
+✓ M6 /fe/cabys · búsqueda por descripción con top             235 ms   total=73, devueltos=3
+✓ M6 /fe/cabys · código inexistente devuelve arreglo vacío    280 ms
+    [] — la interfaz lo presenta como «Sin coincidencias»
+✓ HTTP · dos llamadas simultáneas idénticas comparten una sola solicitud   177 ms
+    una única solicitud de red (protege contra el doble clic)
+====================================================================================
+TOTAL: 17 superadas, 0 fallidas
+```
+
+### Observaciones
+
+- **Códigos HTTP cubiertos con tráfico real:** 200, 400, 404 y 503.
+- **El código 429 no se provocó deliberadamente.** Hacerlo habría bloqueado la dirección IP durante diez minutos y habría afectado a otros usuarios de la misma red, contraviniendo la política de uso del Ministerio. Su ruta de clasificación y reintento se validó en el banco de lógica pura (`detectarErrorIncrustado` y la tabla de mensajes), y en el navegador se comprobó que el mensaje asociado existe y es comprensible.
+- **Caché:** la segunda llamada idéntica se resolvió en 0 ms sin tráfico de red.
+- **Deduplicación:** dos llamadas simultáneas idénticas devolvieron la misma referencia de objeto, prueba de que compartieron una única solicitud.
+- **Diferencia entre Node y navegador:** en Node no rige la política CORS, por lo que un 404 llega como `not-found`. En el navegador, ese mismo caso pasa por la sonda de conectividad; su comportamiento se verificó en el banco 3.
+
+### Defecto encontrado y corregido en esta fase
+
+**Espera excesiva por acumulación de tiempos de espera.** El caso «parámetro ausente» tardó 21,7 s: el primer intento agotó el tiempo de espera de 20 s y se reintentó. Con tres reintentos, el peor caso superaba el minuto frente al indicador de proceso. Corregido: el tiempo de espera se redujo a 15 s y los reintentos por tiempo agotado se limitaron a uno. El mismo caso pasó a 16,4 s, y los reintentos por 429 y 5xx conservan el máximo de tres.
+
+---
+
+## 3. Banco de navegador real (Google Chrome) — 46 casos
+
+Ejecutado con Playwright sobre Chrome, con consultas reales a la API.
+
+```
+$ node pruebas/pruebas-navegador.js "…/index.html" "pruebas/capturas"
+
+PRUEBAS EN NAVEGADOR REAL (Chrome)
+====================================================================================
+✓ Carga sin errores de JavaScript                    ninguna excepción registrada
+✓ Título y encabezado presentes                      Verificador Hacienda CR
+✓ Los 6 módulos están declarados como pestañas       Situación tributaria · Tipo de cambio ·
+                                                     Exoneraciones · Agropecuario (MAG) ·
+                                                     Pesca (INCOPESCA) · CABYS
+✓ M1 · contribuyente existente muestra el nombre     INSTITUTO COSTARRICENSE DE ELECTRICIDAD
+✓ M1 · tabla de actividades económicas renderizada   3 filas visibles
+✓ M1 · mensaje de éxito visible                      «Consulta realizada»
+✓ M1 · identificación no numérica se rechaza antes de consultar
+✓ M1 · el campo queda marcado como inválido          aria-invalid="true"
+✓ M1 · identificación con 0 inicial se bloquea antes de consultar
+                                                     «El número no debe comenzar con cero…»
+✓ M1 · registro inexistente → «Contribuyente no encontrado»   (404 sin CORS, vía sonda)
+✓ M2 · tipo de cambio vigente muestra compra y venta ₡ 449,94 | ₡ 454,55 | ₡ 4,61
+✓ M2 · se indica la fuente oficial                   Ministerio de Hacienda de Costa Rica
+✓ M2 · fecha inicial posterior a la final se rechaza localmente
+✓ M2 · el 503 del histórico se traduce a un mensaje comprensible
+                                                     «Servicio histórico temporalmente no disponible»
+✓ M2 · se enlaza el cuadro histórico exacto del BCCR
+                                                     sdd.bccr.fi.cr/…/Contenedor/6?Cuadro=1
+✓ M2 · una segunda consulta no repite la espera de reintentos
+                                                     respondió en 23 ms (frente a ≈7 s)
+✓ M2 · se ofrece un botón para volver a comprobar el servicio   «🔄 Comprobar de nuevo»
+✓ M2 · «Comprobar de nuevo» reintenta realmente contra la API
+✓ M3 · 10 dígitos se convierten al formato oficial   "0046085320" → AL-00460853-20
+✓ M3 · autorización válida muestra los datos de la exoneración
+✓ M3 · códigos CABYS cubiertos se listan en tabla    7211200000100
+✓ M3 · formato incorrecto se rechaza sin consultar la API
+✓ M4 · no registrado se comunica con prudencia       «No figura en el registro consultado»
+✓ M4 · se ofrece el portal oficial del MAG para verificación cruzada
+                                                     mag.go.cr/servicios-y-tramites/consultaproductor/
+✓ M5 · registro pesquero no encontrado se comunica correctamente
+✓ M6 · búsqueda por código devuelve el bien con su IVA
+                                                     2132100000100 · Jugo de tomate concentrado · 13 %
+✓ M6 · al elegir «por descripción» se oculta el campo de código
+✓ M6 · al volver a «por código» se oculta el campo de descripción
+✓ M6 · búsqueda por descripción devuelve resultados paginados   10 filas por página
+✓ M6 · el filtro de la tabla reduce los resultados   1–10 de 16  →  1–2 de 2
+✓ M6 · el encabezado expone el orden aplicado        aria-sort="ascending"
+✓ M6 · el botón copia el código CABYS al portapapeles portapapeles = "0113100000000"
+✓ M6 · exportación a CSV genera un archivo con contenido
+                                                     cabys_busqueda_2026-07-29_1241.csv · 16 filas
+✓ A11y · las flechas del teclado desplazan el foco entre pestañas
+✓ A11y · la pestaña activa se marca con aria-selected
+✓ A11y · el panel correspondiente queda visible y el resto oculto
+✓ A11y · sólo una pestaña participa en el orden de tabulación   tabindex = -1
+✓ A11y · existe enlace para saltar al contenido
+✓ A11y · regiones aria-live para anunciar resultados  17 regiones declaradas
+✓ UI · el conmutador aplica el modo oscuro            data-theme="dark"
+✓ Privacidad · «Limpiar caché» vacía las consultas    5 → 0
+✓ Privacidad · ninguna identificación consultada queda almacenada
+                                                     localStorage = verificadorHaciendaCR.prefs
+                                                     sessionStorage = 0 claves
+✓ Errores · la falta de conexión produce un mensaje específico
+✓ Errores · la barra de estado refleja la desconexión
+✓ Móvil · la página no desborda horizontalmente (390 px)   scrollWidth − clientWidth = 0 px
+✓ Móvil · la tabla se reorganiza en tarjetas apiladas       display de las celdas = flex
+✓ Móvil · los botones cumplen el objetivo táctil mínimo     altura del botón = 44 px
+====================================================================================
+TOTAL: 47 superadas, 0 fallidas
+```
+
+### Defecto encontrado y corregido en esta fase
+
+**El atributo `hidden` no ocultaba los campos del módulo CABYS.** Al elegir «por descripción», el campo «Código CABYS» seguía visible. Causa: la regla `.field{display:flex}` tiene mayor especificidad que la declaración `[hidden]{display:none}` de la hoja de estilos del navegador. Detectado en la captura de pantalla y confirmado midiendo el estilo calculado:
+
+```
+CAMPOS CABYS (modo descripción) — ANTES
+  wrap-cabys-codigo   hidden=true   display=flex   visible=true   ← defecto
+  wrap-cabys-q        hidden=false  display=flex   visible=true
+
+CAMPOS CABYS (modo descripción) — DESPUÉS
+  wrap-cabys-codigo   hidden=true   display=none   visible=false  ← corregido
+  wrap-cabys-q        hidden=false  display=flex   visible=true
+```
+
+Corregido con la regla `[hidden]{ display:none !important; }`, y añadidos dos casos de regresión al banco de pruebas (los dos casos «M6 · al elegir / al volver…» del listado anterior).
+
+### Falso positivo descartado
+
+En la captura del modo oscuro pareció que la pestaña activa no se resaltaba. La medición del estilo calculado demostró que el comportamiento era correcto y que se trataba de una apreciación equivocada de la imagen:
+
+```
+PESTAÑAS en modo oscuro (CABYS seleccionada)
+  tab-tributaria    aria-selected=false   bg=rgba(0,0,0,0)      color=rgb(174,186,218)
+  tab-cabys         aria-selected=true    bg=rgb(123,163,240)   color=rgb(12,18,34)
+```
+
+No se realizó ningún cambio por este motivo.
+
+---
+
+## 4. Evidencia gráfica
+
+Carpeta `pruebas/capturas/`, generada automáticamente durante la ejecución del banco 3:
+
+| Archivo | Contenido |
+|---|---|
+| `01-tributaria-escritorio.png` | Módulo 1 con una consulta real resuelta (1280 × 900) |
+| `02-tipo-cambio-escritorio.png` | Tipo de cambio vigente con compra, venta y fuente oficial |
+| `03-exoneracion-escritorio.png` | Autorización `AL-00460853-20` con todos sus campos |
+| `04-cabys-escritorio.png` | Catálogo CABYS con tabla, filtro, orden y paginación |
+| `05-cabys-modo-oscuro.png` | La misma pantalla en modo oscuro |
+| `06-cabys-movil.png` | Vista móvil 390 × 844, tabla apilada en tarjetas |
+| `07-tributaria-movil.png` | Módulo 1 en móvil con resultado real |
+| `08-historico-503-primer-intento.png` | Aviso del 503 tras los reintentos automáticos |
+| `09-historico-503-segundo-intento.png` | Aviso inmediato con el botón «Comprobar de nuevo» |
+| `cabys-exportado.csv` | CSV descargado por la propia aplicación durante la prueba |
+
+Extracto del CSV exportado, con separador `;`, BOM UTF-8 y comillas escapadas:
+
+```csv
+"Código CABYS";"Descripción del bien o servicio";"IVA";"Categoría principal";"Clasificación completa"
+"0113100000000";"Arroz, para siembra (semillas)";"1";"Productos de la agricultura, silvicultura y pesca";"…"
+"2312000000300";"Harina de arroz";"13";"Productos alimenticios, bebidas y tabaco; …";"…"
+```
+
+---
+
+## 5. Prueba del proxy opcional
+
+```
+$ node proxy/server.js --port 8791
+Proxy del Verificador Hacienda CR escuchando en http://localhost:8791
+
+$ curl -s "http://localhost:8791/salud"
+{"code":200,"status":"OK","proxy":"VerificadorHaciendaCR"}
+
+$ curl -s -D - "http://localhost:8791/fe/ae?identificacion=4000042139" | head -6
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-store
+X-Proxy-Upstream-Status: 200
+Access-Control-Allow-Origin: *
+
+$ curl -s -D - "http://localhost:8791/fe/ae?identificacion=3101002949" | head -6
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+Cache-Control: no-store
+X-Proxy-Upstream-Status: 404
+Access-Control-Allow-Origin: *          ← el 404 pasa a ser legible por el navegador
+
+$ curl -s "http://localhost:8791/otra/cosa"
+{"code":403,"status":"Ruta no permitida: /otra/cosa","proxy":true}
+```
+
+Se confirman las tres propiedades buscadas: el código y el cuerpo originales se conservan, se añaden las cabeceras CORS y la lista blanca impide que el proxy funcione como reenviador abierto.
+
+---
+
+## 6. Cobertura respecto a las pruebas mínimas solicitadas
+
+| Prueba requerida | Estado | Dónde consta |
+|---|---|---|
+| Identificación válida e inválida | Cubierta | Banco 1 (9 casos) · Banco 3 |
+| Contribuyente existente y no encontrado | Cubierta | Banco 2 · Banco 3 |
+| Tipo de cambio actual | Cubierta | Banco 2 · Banco 3 · captura 02 |
+| Rango histórico válido e inválido | Cubierta | Banco 1 (12 casos) · Banco 2 · Banco 3 |
+| Autorización de exoneración válida y con formato incorrecto | Cubierta | Banco 1 · Banco 2 · Banco 3 · captura 03 |
+| Productor agropecuario encontrado y no encontrado | **Parcial** | Caso «no encontrado» verificado. No se localizó ningún caso positivo pese a probar más de treinta identificaciones y agotar cuatro vías externas (sección 0 bis). Véase `README.md`, advertencia 3. |
+| Registro pesquero encontrado y no encontrado | **Parcial** | Misma situación que el anterior |
+| CABYS por código y por descripción | Cubierta | Banco 2 · Banco 3 · captura 04 |
+| Error HTTP 400 | Cubierta | Banco 2 (dos casos, con tráfico real) |
+| Error HTTP 404 | Cubierta | Banco 2 · Banco 3 (ruta CORS) |
+| Error HTTP 429 | **Por diseño, no provocado** | Provocarlo habría bloqueado la IP durante 10 minutos y afectado a terceros. Ruta de clasificación validada en el Banco 1. |
+| Errores HTTP 500 | Cubierta | El 503 real del histórico se ejercitó en los bancos 2 y 3 |
+| Falta de conexión | Cubierta | Banco 3, con desconexión simulada por el navegador |
+| Visualización en computadora y teléfono | Cubierta | Banco 3 · capturas 01–07 |
+| Navegación mediante teclado | Cubierta | Banco 3 (6 casos de accesibilidad) |
+
+---
+
+## 7. Reproducción de las pruebas
+
+```bash
+# Banco 1 — no consume la API
+node pruebas/pruebas-logica.js index.html
+
+# Banco 2 — realiza unas 17 llamadas reales, muy por debajo de los límites oficiales
+node pruebas/pruebas-api.js index.html
+
+# Banco 3 — requiere Playwright y Google Chrome instalado
+npm install playwright
+node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
+
+# Proxy opcional
+node proxy/server.js --port 8787
+curl "http://localhost:8787/salud"
+```
+
+Los bancos 2 y 3 consultan servicios oficiales. Ejecútelos con moderación: cada ejecución completa realiza aproximadamente 30 solicitudes, cifra muy inferior a los umbrales publicados, pero conviene no repetirlas en bucle.
