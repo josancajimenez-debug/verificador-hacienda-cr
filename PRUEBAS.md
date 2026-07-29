@@ -517,27 +517,31 @@ Realizada sobre el estado actual, que incluye el manual de usuario en ventana mo
 | Manual modal | `<dialog>` nativo, nombre accesible, el foco entra y se restaura, bloquea el fondo, cierra con Escape y con el botón |
 | Paneles informativos | Seis, como `<details>`, plegables con teclado |
 | Enlaces externos | Los cuatro responden 200 |
-| Correspondencia entre etiqueta y documento citado | Las siete correctas, incluida «Decreto 41779-H → RL 9635.pdf», que es en efecto el Reglamento de la Ley 9635 del IVA |
+| Correspondencia entre cita y norma | Las siete correctas, incluida «Decreto 41779-H = Reglamento de la Ley 9635 del IVA» |
 | Referencias al módulo de histórico retirado | Ninguna en manual, paneles ni interfaz |
 | Adaptación con el manual abierto | Sin desbordamiento en 320, 390, 768 y 1280 px |
 | Contenido del ZIP tras extraerlo | Los diez recursos presentes; la aplicación pasa los bancos de estructura y navegador desde la copia extraída |
 
 ### Defectos encontrados y corregidos
 
-**1. Los ocho documentos legales enlazados devolvían 404 en el sitio publicado.** Los paneles informativos y las referencias del manual enlazan documentos de `BIBLIOGRAFÍA/`, pero esa carpeta estaba excluida por completo en `.gitignore`. La exclusión se había escrito antes de que existieran los enlaces, de modo que funcionaban en local y fallaban en el sitio web sin señal alguna. Corregido: se publican esos ocho archivos y sólo esos.
+**1. Los ocho documentos legales enlazados devolvían 404 en el sitio publicado.** Los paneles informativos y las referencias enlazaban documentos de `BIBLIOGRAFÍA/`, pero esa carpeta estaba excluida en `.gitignore`: los enlaces funcionaban en local y fallaban en el sitio web sin señal alguna.
+
+**Resolución definitiva:** se retiraron los enlaces. La bibliografía es el respaldo documental con el que se redactaron las explicaciones, no material que la aplicación deba distribuir. Las citas APA se conservan como texto —la atribución no cambia— y los enlaces de norma pasaron a `<cite>`, de modo que la referencia sigue identificada en pantalla sin apuntar a un archivo.
+
+Efecto secundario valioso: `index.html` volvió a ser **verdaderamente autónomo**. Comprobado copiándolo solo a una carpeta vacía:
 
 ```text
-antes   BIBLIOGRAFÍA/ANEXOS%20Y%20ESTRUCTURAS_V4.4.pdf   → 404
-después BIBLIOGRAFÍA/ANEXOS%20Y%20ESTRUCTURAS_V4.4.pdf   → 200 application/pdf
+carpeta con un único archivo (293 KB)  →  53 de 53 comprobaciones correctas
+enlaces relativos de la página         →  0
 ```
 
-Se añadió al banco del sitio publicado la comprobación que habría detectado esto: recorrer **todos** los enlaces relativos de la página y exigir que resuelvan.
+Se añadió al banco del sitio publicado la comprobación que habría detectado el problema original: recorrer todos los enlaces relativos y exigir que ninguno quede roto.
 
 **2. El manual describía mal la exportación a CSV.** Decía «descarga las filas visibles». En realidad exporta todas las filas que cumplen el filtro, en el orden elegido: con 16 registros y 10 por página, el archivo contiene 16 filas. Quien creyera lo contrario recorrería las páginas exportando varias veces. Corregido en el texto del manual.
 
 **3. El README afirmaba que `index.html` es «autónomo» y el «único archivo necesario».** Dejó de ser cierto cuando la cabecera pasó a mostrar `ACC.CONTADORES.jpg` y los paneles a enlazar la bibliografía. Corregido, indicando qué recursos deben acompañar al HTML.
 
-**4. El ZIP no incluía esos recursos.** Al descomprimirlo, el logo y los ocho documentos faltaban. Ahora el paquete se genera con `git archive HEAD`, de modo que **el ZIP y el sitio publicado contienen exactamente lo mismo**, y se verifica extrayéndolo y ejecutando los bancos sobre la copia.
+**4. El ZIP no reflejaba lo publicado.** Ahora se genera con `git archive HEAD`, de modo que **el ZIP y el sitio publicado contienen exactamente lo mismo**, y se verifica extrayéndolo y ejecutando los bancos sobre la copia.
 
 ### Hallazgo sobre el servicio oficial
 
