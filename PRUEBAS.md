@@ -9,7 +9,8 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 | 1 · Lógica pura | 60 | 60 | 0 |
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
 | 3 · Navegador real (Chrome) | 46 | 46 | 0 |
-| **Total** | **122** | **122** | **0** |
+| 4 · Sitio publicado (URL pública real) | 8 | 8 | 0 |
+| **Total** | **130** | **130** | **0** |
 
 Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
 
@@ -388,8 +389,8 @@ Carpeta `pruebas/capturas/`, generada automáticamente durante la ejecución del
 | `05-cabys-modo-oscuro.png` | La misma pantalla en modo oscuro |
 | `06-cabys-movil.png` | Vista móvil 390 × 844, tabla apilada en tarjetas |
 | `07-tributaria-movil.png` | Módulo 1 en móvil con resultado real |
-| `08-historico-503-primer-intento.png` | Aviso del 503 tras los reintentos automáticos |
-| `09-historico-503-segundo-intento.png` | Aviso inmediato con el botón «Comprobar de nuevo» |
+| `10-sitio-publicado.png` | El **sitio publicado** en GitHub Pages, con consulta resuelta |
+| `11-sitio-publicado-movil.png` | El sitio publicado en móvil (390 × 844) con consulta resuelta |
 | `cabys-exportado.csv` | CSV descargado por la propia aplicación durante la prueba |
 
 Extracto del CSV exportado, con separador `;`, BOM UTF-8 y comillas escapadas:
@@ -455,6 +456,43 @@ Se confirman las tres propiedades buscadas: el código y el cuerpo originales se
 
 ---
 
+## 6 bis. Banco del sitio publicado — 8 casos
+
+Verifica la aplicación ya desplegada en <https://josancajimenez-debug.github.io/verificador-hacienda-cr/>, con consultas reales desde el origen público. Es la prueba decisiva del comportamiento CORS: abrir un archivo local no somete al navegador a las mismas reglas que un origen `https://` real.
+
+```text
+VERIFICACIÓN DEL SITIO PUBLICADO
+========================================================================================
+✓ El sitio responde por HTTPS                    HTTP 200
+✓ Carga sin errores de JavaScript                ninguna excepción
+✓ Logo de ACC Contadores visible                 imagen incrustada, cargada correctamente
+✓ M1 · consulta real a api.hacienda.go.cr        HACIENDA SAN JERONIMO SOCIEDAD ANONIMA
+✓ M2 · tipo de cambio desde el sitio público     ₡ 449,94 | ₡ 454,55 | ₡ 4,61
+✓ M6 · CABYS desde el sitio público              2132100000100 · Jugo de tomate concentrado · 13 %
+✓ M3 · 404 sin CORS bien clasificado             «Autorización no encontrada»
+✓ Móvil · funciona y no desborda                 desbordamiento = 0 px, consulta resuelta
+========================================================================================
+TOTAL: 8 superadas, 0 fallidas
+```
+
+El caso M3 es el más relevante. La consola del navegador registra el bloqueo real:
+
+```text
+Access to fetch at "https://api.hacienda.go.cr/fe/ex?autorizacion=AL-01234567-89"
+from origin "https://josancajimenez-debug.github.io" has been blocked by CORS
+policy: No "Access-Control-Allow-Origin"
+```
+
+y aun así la interfaz muestra «Autorización no encontrada» en 1,8 segundos, gracias a la sonda de conectividad descrita en `README.md`, sección 4.
+
+### Defecto encontrado y corregido al publicar
+
+**Petición 404 a `/favicon.ico`.** Al verificar el sitio publicado, la consola registraba un error 404: el navegador pide el icono del sitio y un alojamiento estático no lo tiene. No afectaba al funcionamiento, pero ensuciaba la consola, que es justamente donde esta aplicación deja sus detalles técnicos de diagnóstico. Corregido incrustando el icono como data URI, tomado del visto bueno del logo de ACC Contadores.
+
+Este defecto **no era detectable** en el banco 3, que abre la aplicación como archivo local: sólo apareció al probarla en su URL pública.
+
+---
+
 ## 7. Reproducción de las pruebas
 
 ```bash
@@ -467,6 +505,9 @@ node pruebas/pruebas-api.js index.html
 # Banco 3 — requiere Playwright y Google Chrome instalado
 npm install playwright
 node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
+
+# Banco 4 — contra el sitio ya publicado
+node pruebas/pruebas-sitio-publicado.js "https://josancajimenez-debug.github.io/verificador-hacienda-cr/" "pruebas/capturas"
 
 # Proxy opcional
 node proxy/server.js --port 8787

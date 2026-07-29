@@ -7,6 +7,7 @@ BIBLIOGRAFÍA/
 verificador-hacienda-cr.zip
 
 # Archivos temporales
+node_modules/
 *.tmp
 *.log
 Thumbs.db

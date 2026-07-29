@@ -30,7 +30,11 @@ Un solo archivo `index.html`, autónomo, sin dependencias, sin compilación y si
 
 **Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada ni levantar un servidor: la aplicación consulta directamente los servicios oficiales.
 
-**Publicación en Internet.** Suba `index.html` a GitHub Pages, Netlify, Cloudflare Pages o cualquier alojamiento estático y comparta el enlace. Consulte la [sección 6](#6-publicación-y-forma-de-compartir-la-aplicación).
+**Aplicación ya publicada:** <https://josancajimenez-debug.github.io/verificador-hacienda-cr/>
+
+Ese enlace es público: puede compartirse por correo, WhatsApp o como material de un curso, y funciona en computadora, tableta y teléfono sin instalar nada.
+
+**Para publicar su propia copia**, suba `index.html` a GitHub Pages, Netlify, Cloudflare Pages o cualquier alojamiento estático. Consulte la [sección 6](#6-publicación-y-forma-de-compartir-la-aplicación).
 
 Requisitos del navegador: soporte de `fetch`, `async/await`, `Intl` y variables CSS. Cumple cualquier versión publicada desde 2020 aproximadamente.
 
@@ -54,6 +58,7 @@ VERIFICADOR/
     ├── pruebas-logica.js      ← 60 pruebas de validadores y normalizadores.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-navegador.js   ← 46 pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-sitio-publicado.js ← 8 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
 
@@ -279,7 +284,23 @@ Access-Control-Allow-Origin: *      ← ahora el navegador SÍ puede leer el 404
 
 ## 6. Publicación y forma de compartir la aplicación
 
-### GitHub Pages (gratuito, sin backend)
+### Enlace público en funcionamiento
+
+**<https://josancajimenez-debug.github.io/verificador-hacienda-cr/>**
+
+Publicado con GitHub Pages desde el repositorio <https://github.com/josancajimenez-debug/verificador-hacienda-cr>. Es gratuito, se sirve por HTTPS y no caduca.
+
+Para **actualizar** el sitio basta con publicar los cambios; GitHub Pages reconstruye solo en un par de minutos:
+
+```bash
+git add index.html
+git commit -m "Descripción del cambio"
+git push
+```
+
+> **Por qué no se publicó como Artifact de Claude.** Se evaluó esa vía. Un Artifact se sirve con una política de seguridad de contenido (CSP) estricta que **bloquea cualquier petición a un servidor externo**, incluidas las de `fetch`. La aplicación se vería correctamente, pero **ninguna consulta a `api.hacienda.go.cr` funcionaría**, que es justamente su razón de ser. Las capacidades que un Artifact puede solicitar (`downloads` y `mcp`) no incluyen acceso de red a terceros, y no existe forma de sortearlo. Por eso se optó por un alojamiento estático convencional, donde las consultas sí funcionan: verificado en el banco de pruebas del sitio publicado.
+
+### Publicar su propia copia en GitHub Pages
 
 ```bash
 git init
@@ -394,7 +415,8 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Lógica pura (validadores, normalizadores, clasificadores) | 60 | 60 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 46 | 46 correctos |
-| **Total** | **122** | **122 correctos** |
+| Sitio publicado (URL pública real) | 8 | 8 correctos |
+| **Total** | **130** | **130 correctos** |
 
 Cómo ejecutarlas (Node.js 18 o superior):
 

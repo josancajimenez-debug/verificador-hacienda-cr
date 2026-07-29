@@ -1,0 +1,11 @@
+{
+  "name": "verificador-hacienda-cr",
+  "private": true,
+  "scripts": {
+    "test:logica": "node pruebas/pruebas-logica.js index.html",
+    "test:navegador": "node pruebas/pruebas-navegador.js index.html pruebas/capturas"
+  },
+  "devDependencies": {
+    "playwright": "^1.54.1"
+  }
+}

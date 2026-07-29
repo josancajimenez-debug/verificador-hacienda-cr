@@ -9,8 +9,8 @@ const { chromium } = require("playwright");
 const path = require("node:path");
 const fs = require("node:fs");
 
-const APP = "file:///" + process.argv[2].replace(/\\/g, "/");
-const SHOTS = process.argv[3];
+const APP = "file:///" + path.resolve(process.argv[2]).replace(/\\/g, "/");
+const SHOTS = path.resolve(process.argv[3]);
 
 let ok = 0, ko = 0;
 function check(nombre, cond, nota) {
@@ -50,19 +50,61 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   /* ---- Logo institucional ---- */
   const logo = page.locator(".brand__logo");
   const logoInfo = await logo.evaluate((n) => ({
-    incrustado: n.src.startsWith("data:image/"),
+    local: n.src.endsWith("/ACC.CONTADORES.jpg"),
     cargada: n.complete && n.naturalWidth > 0,
+    completo: n.naturalWidth === 1600 && n.naturalHeight === 1456,
     alt: n.getAttribute("alt"),
     alto: Math.round(n.getBoundingClientRect().height)
   }));
-  check("Logo ACC Contadores incrustado y renderizado",
-    logoInfo.incrustado && logoInfo.cargada && logoInfo.alto > 40,
-    `data URI=${logoInfo.incrustado}, cargada=${logoInfo.cargada}, alto=${logoInfo.alto}px, alt="${logoInfo.alt}"`);
+  check("Logo completo de ACC Contadores renderizado",
+    logoInfo.local && logoInfo.cargada && logoInfo.completo && logoInfo.alto > 70,
+    `local=${logoInfo.local}, completo=${logoInfo.completo}, cargada=${logoInfo.cargada}, alto=${logoInfo.alto}px, alt="${logoInfo.alt}"`);
 
   check("La página no depende de ningún recurso externo",
     await page.evaluate(() => ![...document.querySelectorAll("img,script,link,iframe")]
       .some((n) => /^https?:/i.test(n.getAttribute("src") || n.getAttribute("href") || ""))),
     "sin src/href http(s) externos: funciona sin conexión salvo las consultas a la API");
+
+  const verificadorComprobante = await page.locator("#btn-verificar-comprobante").evaluate((n) => ({
+    href: n.href,
+    target: n.target,
+    rel: n.rel,
+    texto: n.textContent.trim()
+  }));
+  check("El encabezado enlaza al verificador oficial de comprobantes",
+    verificadorComprobante.href === "https://ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/" &&
+      verificadorComprobante.target === "_blank" &&
+      verificadorComprobante.rel.includes("noopener") &&
+      /Verificar comprobante/i.test(verificadorComprobante.texto),
+    `${verificadorComprobante.texto} → ${verificadorComprobante.href}`);
+
+  await page.click("#btn-manual");
+  const manual = await page.locator("#manual-usuario").evaluate((n) => ({
+    abierto: n.open,
+    secciones: n.querySelectorAll(".manual__section").length,
+    modulos: n.querySelectorAll("#manual-modulos h4").length,
+    titulo: n.querySelector("#manual-titulo")?.textContent.trim()
+  }));
+  check("El manual de usuario abre y cubre los 6 módulos",
+    manual.abierto && manual.secciones === 6 && manual.modulos === 6 &&
+      /Manual de usuario/i.test(manual.titulo),
+    `${manual.secciones} secciones · ${manual.modulos} módulos · "${manual.titulo}"`);
+  await page.click(".manual__close");
+  check("El manual se cierra y devuelve el foco al botón",
+    !(await page.locator("#manual-usuario").evaluate((n) => n.open)) &&
+      await page.locator("#btn-manual").evaluate((n) => document.activeElement === n),
+    "diálogo cerrado y foco restaurado");
+
+  const guiasEducativas = await page.evaluate(() => ({
+    guias: document.querySelectorAll("[role='tabpanel'] .guide").length,
+    apartados: document.querySelectorAll("[role='tabpanel'] .guide__item").length,
+    citas: document.querySelectorAll("[role='tabpanel'] .guide__source").length,
+    referencias: document.querySelectorAll(".references__body > p:not(.references__note)").length
+  }));
+  check("Los 6 módulos incluyen guía educativa y referencias APA",
+    guiasEducativas.guias === 6 && guiasEducativas.apartados === 24 &&
+      guiasEducativas.citas === 6 && guiasEducativas.referencias === 8,
+    `${guiasEducativas.guias} guías · ${guiasEducativas.apartados} apartados · ${guiasEducativas.citas} citas · ${guiasEducativas.referencias} referencias`);
 
   /* ---- El módulo de histórico ya no existe ---- */
   const restos = await page.evaluate(() => ["form-tchist", "in-desde", "in-hasta", "btn-tchist", "out-tchist"]
