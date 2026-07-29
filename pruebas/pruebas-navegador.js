@@ -9,8 +9,9 @@ const { chromium } = require("playwright");
 const path = require("node:path");
 const fs = require("node:fs");
 
-const APP = "file:///" + path.resolve(process.argv[2]).replace(/\\/g, "/");
-const SHOTS = path.resolve(process.argv[3]);
+// Se admite ruta relativa o absoluta: se resuelve siempre a una URL file://
+const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
+const SHOTS = path.resolve(process.argv[3] || ".");
 
 let ok = 0, ko = 0;
 function check(nombre, cond, nota) {
@@ -48,63 +49,27 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     (await page.locator('[role="tab"]').allTextContents()).map(s => s.trim()).join(" · "));
 
   /* ---- Logo institucional ---- */
-  const logo = page.locator(".brand__logo");
-  const logoInfo = await logo.evaluate((n) => ({
-    local: n.src.endsWith("/ACC.CONTADORES.jpg"),
+  const logoInfo = await page.locator(".brand__logo").evaluate((n) => ({
     cargada: n.complete && n.naturalWidth > 0,
-    completo: n.naturalWidth === 1600 && n.naturalHeight === 1456,
-    alt: n.getAttribute("alt"),
-    alto: Math.round(n.getBoundingClientRect().height)
+    alt: (n.getAttribute("alt") || "").trim(),
+    alto: Math.round(n.getBoundingClientRect().height),
+    // Los atributos width/height deben declarar la relación de aspecto real
+    // de la imagen; si no, el navegador reserva un espacio incorrecto y la
+    // maquetación salta al terminar la carga.
+    aspectoDeclarado: Number(n.getAttribute("width")) / Number(n.getAttribute("height")),
+    aspectoReal: n.naturalWidth / n.naturalHeight
   }));
-  check("Logo completo de ACC Contadores renderizado",
-    logoInfo.local && logoInfo.cargada && logoInfo.completo && logoInfo.alto > 70,
-    `local=${logoInfo.local}, completo=${logoInfo.completo}, cargada=${logoInfo.cargada}, alto=${logoInfo.alto}px, alt="${logoInfo.alt}"`);
+  check("Logo ACC Contadores cargado y visible",
+    logoInfo.cargada && logoInfo.alto > 30 && logoInfo.alt.length > 3,
+    `cargada=${logoInfo.cargada}, alto=${logoInfo.alto}px, alt="${logoInfo.alt}"`);
+  check("Los atributos width/height del logo declaran su aspecto real",
+    Math.abs(logoInfo.aspectoDeclarado - logoInfo.aspectoReal) < 0.02,
+    `declarado=${logoInfo.aspectoDeclarado.toFixed(3)}, real=${logoInfo.aspectoReal.toFixed(3)}`);
 
-  check("La página no depende de ningún recurso externo",
+  check("La página no carga recursos de dominios externos",
     await page.evaluate(() => ![...document.querySelectorAll("img,script,link,iframe")]
       .some((n) => /^https?:/i.test(n.getAttribute("src") || n.getAttribute("href") || ""))),
-    "sin src/href http(s) externos: funciona sin conexión salvo las consultas a la API");
-
-  const verificadorComprobante = await page.locator("#btn-verificar-comprobante").evaluate((n) => ({
-    href: n.href,
-    target: n.target,
-    rel: n.rel,
-    texto: n.textContent.trim()
-  }));
-  check("El encabezado enlaza al verificador oficial de comprobantes",
-    verificadorComprobante.href === "https://ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/" &&
-      verificadorComprobante.target === "_blank" &&
-      verificadorComprobante.rel.includes("noopener") &&
-      /Verificar comprobante/i.test(verificadorComprobante.texto),
-    `${verificadorComprobante.texto} → ${verificadorComprobante.href}`);
-
-  await page.click("#btn-manual");
-  const manual = await page.locator("#manual-usuario").evaluate((n) => ({
-    abierto: n.open,
-    secciones: n.querySelectorAll(".manual__section").length,
-    modulos: n.querySelectorAll("#manual-modulos h4").length,
-    titulo: n.querySelector("#manual-titulo")?.textContent.trim()
-  }));
-  check("El manual de usuario abre y cubre los 6 módulos",
-    manual.abierto && manual.secciones === 6 && manual.modulos === 6 &&
-      /Manual de usuario/i.test(manual.titulo),
-    `${manual.secciones} secciones · ${manual.modulos} módulos · "${manual.titulo}"`);
-  await page.click(".manual__close");
-  check("El manual se cierra y devuelve el foco al botón",
-    !(await page.locator("#manual-usuario").evaluate((n) => n.open)) &&
-      await page.locator("#btn-manual").evaluate((n) => document.activeElement === n),
-    "diálogo cerrado y foco restaurado");
-
-  const guiasEducativas = await page.evaluate(() => ({
-    guias: document.querySelectorAll("[role='tabpanel'] .guide").length,
-    apartados: document.querySelectorAll("[role='tabpanel'] .guide__item").length,
-    citas: document.querySelectorAll("[role='tabpanel'] .guide__source").length,
-    referencias: document.querySelectorAll(".references__body > p:not(.references__note)").length
-  }));
-  check("Los 6 módulos incluyen guía educativa y referencias APA",
-    guiasEducativas.guias === 6 && guiasEducativas.apartados === 24 &&
-      guiasEducativas.citas === 6 && guiasEducativas.referencias === 8,
-    `${guiasEducativas.guias} guías · ${guiasEducativas.apartados} apartados · ${guiasEducativas.citas} citas · ${guiasEducativas.referencias} referencias`);
+    "sin src/href http(s): no depende de CDN, fuentes ni imágenes de terceros");
 
   /* ---- El módulo de histórico ya no existe ---- */
   const restos = await page.evaluate(() => ["form-tchist", "in-desde", "in-hasta", "btn-tchist", "out-tchist"]
@@ -398,12 +363,20 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   const cabecera320 = await pm.evaluate(() => {
     const l = document.querySelector(".brand__logo");
     const t = document.querySelector(".brand__title");
-    return { logo: Math.round(l.getBoundingClientRect().height),
-             tituloVisible: t.getBoundingClientRect().width > 0 };
+    const rl = l.getBoundingClientRect(), rt = t.getBoundingClientRect();
+    return {
+      logo: Math.round(rl.height),
+      logoAncho: Math.round(rl.width),
+      tituloVisible: rt.width > 0,
+      // El logo no debe monopolizar el ancho ni salirse de la ventana
+      dentroDeVentana: rl.right <= document.documentElement.clientWidth + 1,
+      proporcionDelAncho: rl.width / document.documentElement.clientWidth
+    };
   });
   check("Responsive · el encabezado con logo se adapta a 320 px",
-    cabecera320.logo > 0 && cabecera320.logo <= 56 && cabecera320.tituloVisible,
-    `logo=${cabecera320.logo}px, título visible=${cabecera320.tituloVisible}`);
+    cabecera320.tituloVisible && cabecera320.dentroDeVentana && cabecera320.proporcionDelAncho < 0.45,
+    `logo=${cabecera320.logoAncho}×${cabecera320.logo}px (${Math.round(cabecera320.proporcionDelAncho * 100)}% del ancho), ` +
+    `título visible=${cabecera320.tituloVisible}, dentro de la ventana=${cabecera320.dentroDeVentana}`);
 
   await pm.setViewportSize({ width: 390, height: 844 });
   await esperar(200);

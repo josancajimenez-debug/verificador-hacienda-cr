@@ -3,7 +3,10 @@
   "private": true,
   "scripts": {
     "test:logica": "node pruebas/pruebas-logica.js index.html",
-    "test:navegador": "node pruebas/pruebas-navegador.js index.html pruebas/capturas"
+    "test:api": "node pruebas/pruebas-api.js index.html",
+    "test:navegador": "node pruebas/pruebas-navegador.js index.html pruebas/capturas",
+    "test:sitio": "node pruebas/pruebas-sitio-publicado.js https://josancajimenez-debug.github.io/verificador-hacienda-cr/ pruebas/capturas",
+    "test": "npm run test:logica && npm run test:api && npm run test:navegador"
   },
   "devDependencies": {
     "playwright": "^1.54.1"
