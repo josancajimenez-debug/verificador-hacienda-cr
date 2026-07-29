@@ -8,9 +8,11 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 |---|---:|---:|---:|
 | 1 · Lógica pura | 60 | 60 | 0 |
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
-| 3 · Navegador real (Chrome) | 46 | 46 | 0 |
-| 4 · Sitio publicado (URL pública real) | 8 | 8 | 0 |
-| **Total** | **130** | **130** | **0** |
+| 3 · Estructura y accesibilidad del DOM | 10 | 10 | 0 |
+| 4 · Comportamiento (manual modal, paneles, teclado) | 16 | 16 | 0 |
+| 5 · Navegador real (Chrome) | 47 | 47 | 0 |
+| 6 · Sitio publicado (URL pública real) | 10 | 10 | 0 |
+| **Total** | **159** | **159** | **0** |
 
 Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
 
@@ -493,6 +495,62 @@ Este defecto **no era detectable** en el banco 3, que abre la aplicación como a
 
 ---
 
+## 6 ter. Revisión completa de la aplicación
+
+Realizada sobre el estado actual, que incluye el manual de usuario en ventana modal, los seis paneles «Significado, uso, aplicación e importancia» y el botón que abre el verificador oficial de comprobantes.
+
+### Lo que se comprobó y salió correcto
+
+| Comprobación | Resultado |
+|---|---|
+| Endpoints declarados en `RUTAS` | Sólo los seis oficiales; ninguno inventado |
+| «Verificar comprobante» | No es un endpoint: es un enlace a `ovitribucr.hacienda.go.cr`, que responde 200 |
+| `innerHTML`, `insertAdjacentHTML`, `document.write`, `eval` | Ninguna aparición en código; sólo se mencionan en comentarios |
+| Identificadores duplicados | Ninguno |
+| Referencias `aria-labelledby`, `aria-describedby`, `aria-controls`, `for` | Todas resuelven |
+| Anclas internas del manual | Las seis resuelven |
+| Controles sin etiqueta accesible | Ninguno |
+| Imágenes sin `alt` | Ninguna |
+| `target="_blank"` sin `rel="noopener"` | Ninguno |
+| Orden de encabezados | Sin saltos de nivel; un solo `<h1>` |
+| Identificadores que el script usa pero no existen | Ninguno |
+| Manual modal | `<dialog>` nativo, nombre accesible, el foco entra y se restaura, bloquea el fondo, cierra con Escape y con el botón |
+| Paneles informativos | Seis, como `<details>`, plegables con teclado |
+| Enlaces externos | Los cuatro responden 200 |
+| Correspondencia entre etiqueta y documento citado | Las siete correctas, incluida «Decreto 41779-H → RL 9635.pdf», que es en efecto el Reglamento de la Ley 9635 del IVA |
+| Referencias al módulo de histórico retirado | Ninguna en manual, paneles ni interfaz |
+| Adaptación con el manual abierto | Sin desbordamiento en 320, 390, 768 y 1280 px |
+| Contenido del ZIP tras extraerlo | Los diez recursos presentes; la aplicación pasa los bancos de estructura y navegador desde la copia extraída |
+
+### Defectos encontrados y corregidos
+
+**1. Los ocho documentos legales enlazados devolvían 404 en el sitio publicado.** Los paneles informativos y las referencias del manual enlazan documentos de `BIBLIOGRAFÍA/`, pero esa carpeta estaba excluida por completo en `.gitignore`. La exclusión se había escrito antes de que existieran los enlaces, de modo que funcionaban en local y fallaban en el sitio web sin señal alguna. Corregido: se publican esos ocho archivos y sólo esos.
+
+```text
+antes   BIBLIOGRAFÍA/ANEXOS%20Y%20ESTRUCTURAS_V4.4.pdf   → 404
+después BIBLIOGRAFÍA/ANEXOS%20Y%20ESTRUCTURAS_V4.4.pdf   → 200 application/pdf
+```
+
+Se añadió al banco del sitio publicado la comprobación que habría detectado esto: recorrer **todos** los enlaces relativos de la página y exigir que resuelvan.
+
+**2. El manual describía mal la exportación a CSV.** Decía «descarga las filas visibles». En realidad exporta todas las filas que cumplen el filtro, en el orden elegido: con 16 registros y 10 por página, el archivo contiene 16 filas. Quien creyera lo contrario recorrería las páginas exportando varias veces. Corregido en el texto del manual.
+
+**3. El README afirmaba que `index.html` es «autónomo» y el «único archivo necesario».** Dejó de ser cierto cuando la cabecera pasó a mostrar `ACC.CONTADORES.jpg` y los paneles a enlazar la bibliografía. Corregido, indicando qué recursos deben acompañar al HTML.
+
+**4. El ZIP no incluía esos recursos.** Al descomprimirlo, el logo y los ocho documentos faltaban. Ahora el paquete se genera con `git archive HEAD`, de modo que **el ZIP y el sitio publicado contienen exactamente lo mismo**, y se verifica extrayéndolo y ejecutando los bancos sobre la copia.
+
+### Hallazgo sobre el servicio oficial
+
+**`/fe/ae` sin parámetros dejó de responder.** Por la mañana devolvía `400 Bad Request`; horas después, cuatro comprobaciones consecutivas con `curl` agotaron 25 segundos sin respuesta alguna:
+
+```text
+curl -m 25 "https://api.hacienda.go.cr/fe/ae"   → [000] 25,00 s   (×4)
+```
+
+No es un defecto de la aplicación y **la interfaz no puede llegar a ese caso**, porque la validación exige de 9 a 12 dígitos antes de enviar la solicitud. La prueba correspondiente se reformuló: en lugar de exigir un código HTTP concreto de un recurso inestable, verifica lo que sí está bajo control de la aplicación, que cualquiera de los desenlaces se convierta en un error **tipificado** y traducido, nunca en una excepción sin clasificar. El resultado observado fue `kind="timeout"` → «Tiempo de espera agotado».
+
+---
+
 ## 7. Reproducción de las pruebas
 
 ```bash
@@ -506,8 +564,15 @@ node pruebas/pruebas-api.js index.html
 npm install playwright
 node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
 
-# Banco 4 — contra el sitio ya publicado
+# Bancos 3 y 4 — estructura, accesibilidad y comportamiento
+node pruebas/pruebas-estructura.js index.html
+node pruebas/pruebas-comportamiento.js index.html
+
+# Banco 6 — contra el sitio ya publicado
 node pruebas/pruebas-sitio-publicado.js "https://josancajimenez-debug.github.io/verificador-hacienda-cr/" "pruebas/capturas"
+
+# Todos los bancos locales de una vez
+npm test
 
 # Proxy opcional
 node proxy/server.js --port 8787

@@ -88,9 +88,21 @@ async function caso(nombre, fn, comprobar) {
     () => apiGet(RUTAS.ae, { identificacion: "3101002949" }),
     (r, e) => ({ ok: e?.kind === "not-found", nota: `kind="${e?.kind}", HTTP ${e?.status}` }));
 
-  await caso("M1 /fe/ae · parámetro ausente → bad-request",
-    () => apiGet(RUTAS.ae, {}),
-    (r, e) => ({ ok: e?.kind === "bad-request", nota: `kind="${e?.kind}", HTTP ${e?.status}` }));
+  // Parámetro ausente: el recurso oficial es inestable en este caso concreto.
+  // El 29/07/2026 devolvía 400; horas después dejó de responder por completo
+  // (4 de 4 comprobaciones con curl agotaron 25 s sin respuesta). Lo que esta
+  // prueba verifica, por tanto, no es un código HTTP concreto sino algo que sí
+  // está bajo control de la aplicación: que cualquiera de los dos desenlaces se
+  // convierta en un error TIPIFICADO y nunca en una excepción sin clasificar.
+  // En el navegador este caso es inalcanzable: la validación exige de 9 a 12
+  // dígitos antes de enviar la solicitud.
+  await caso("M1 /fe/ae · parámetro ausente → error tipificado, sin excepción",
+    () => apiGet(RUTAS.ae, {}, { timeout: 12000, maxRetries: 0 }),
+    (r, e) => ({
+      ok: e instanceof Error && typeof e.kind === "string" &&
+          ["bad-request", "timeout", "network", "sin-resultado"].includes(e.kind),
+      nota: `kind="${e?.kind}", HTTP ${e?.status ?? "sin respuesta"} — traducido a un mensaje comprensible`
+    }));
 
   await caso("M1 /fe/ae · identificación con 0 inicial → bad-request (regla verificada)",
     () => apiGet(RUTAS.ae, { identificacion: "012345678" }, { maxRetries: 0 }),
