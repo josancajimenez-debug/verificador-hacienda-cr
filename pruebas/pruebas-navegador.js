@@ -71,6 +71,47 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
       .some((n) => /^https?:/i.test(n.getAttribute("src") || n.getAttribute("href") || ""))),
     "sin src/href http(s): no depende de CDN, fuentes ni imágenes de terceros");
 
+  // El logo debe ir incrustado: así el HTML se puede enviar suelto por correo
+  // sin que la cabecera aparezca rota.
+  const imagenes = await page.evaluate(() => [...document.querySelectorAll("img")].map((n) => ({
+    clase: n.className,
+    incrustada: n.src.startsWith("data:"),
+    cargada: n.complete && n.naturalWidth > 0,
+    px: `${n.naturalWidth}×${n.naturalHeight}`
+  })));
+  check("Todas las imágenes van incrustadas y cargan",
+    imagenes.length > 0 && imagenes.every((i) => i.incrustada && i.cargada),
+    imagenes.map((i) => `${i.clase || "(sin clase)"} ${i.px} data:${i.incrustada}`).join(" · "));
+
+  /* ---- Acceso al Asistente Virtual de ACC Contadores ---- */
+  const asistente = await page.evaluate(() => {
+    const n = document.getElementById("btn-asistente");
+    if (!n) return null;
+    const r = n.getBoundingClientRect();
+    return {
+      href: n.getAttribute("href"),
+      target: n.getAttribute("target"),
+      rel: n.getAttribute("rel"),
+      etiqueta: n.getAttribute("aria-label") || "",
+      texto: n.textContent.trim(),
+      visible: r.width > 0 && r.height > 0,
+      alto: Math.round(r.height),
+      enPie: document.querySelectorAll('a[href*="acc-asistente"]').length
+    };
+  });
+  check("Existe el botón «Asistente virtual» en la cabecera",
+    asistente !== null && asistente.visible, asistente ? `«${asistente.texto}», ${asistente.alto}px de alto` : "no se encontró");
+  check("Apunta al Asistente Virtual de ACC Contadores",
+    asistente?.href === "https://josancajimenez-debug.github.io/acc-asistente/", asistente?.href);
+  check("Se abre en pestaña nueva de forma segura",
+    asistente?.target === "_blank" && /noopener/.test(asistente?.rel || ""),
+    `target=${asistente?.target}, rel="${asistente?.rel}"`);
+  check("Tiene nombre accesible descriptivo",
+    (asistente?.etiqueta || "").length > 30 && /pesta/i.test(asistente.etiqueta),
+    `aria-label de ${asistente?.etiqueta.length} caracteres, avisa de la pestaña nueva`);
+  check("El Asistente también es accesible desde el pie",
+    (asistente?.enPie || 0) >= 2, `${asistente?.enPie} accesos en la página`);
+
   /* ---- El módulo de histórico ya no existe ---- */
   const restos = await page.evaluate(() => ["form-tchist", "in-desde", "in-hasta", "btn-tchist", "out-tchist"]
     .filter((id) => document.getElementById(id) !== null));

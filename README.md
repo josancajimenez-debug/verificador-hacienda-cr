@@ -4,9 +4,9 @@ Aplicación web para consultar información pública mediante las **API oficiale
 
 Referencia técnica única: <https://api.hacienda.go.cr/docs>
 
-Un solo `index.html` con todo el código (HTML, CSS y JavaScript) integrado: sin dependencias, sin compilación y sin backend. Funciona en computadoras, tabletas y teléfonos móviles.
+Un solo `index.html` con todo integrado —HTML, CSS, JavaScript y el logo de ACC Contadores incrustado—: sin dependencias, sin compilación y sin backend. Funciona en computadoras, tabletas y teléfonos móviles.
 
-Junto al HTML viajan dos recursos que la interfaz muestra o enlaza: el logo `ACC.CONTADORES.jpg` y la carpeta `BIBLIOGRAFÍA/` con los ocho documentos legales citados en los paneles informativos. Consérvelos en la misma carpeta.
+La única dependencia externa es la carpeta `BIBLIOGRAFÍA/`, con los ocho documentos legales que enlazan los paneles informativos. Consérvela junto al HTML; sin ella la aplicación funciona igual, sólo dejan de abrirse esos enlaces.
 
 ---
 
@@ -30,7 +30,7 @@ Junto al HTML viajan dos recursos que la interfaz muestra o enlaza: el logo `ACC
 
 ## 1. Puesta en marcha en 30 segundos
 
-**Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada ni levantar un servidor: la aplicación consulta directamente los servicios oficiales. Mantenga a su lado `ACC.CONTADORES.jpg` y la carpeta `BIBLIOGRAFÍA/` para que se vea el logo y funcionen los enlaces a los documentos legales.
+**Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada ni levantar un servidor: la aplicación consulta directamente los servicios oficiales. Mantenga a su lado la carpeta `BIBLIOGRAFÍA/` para que funcionen los enlaces a los documentos legales.
 
 **Aplicación ya publicada:** <https://josancajimenez-debug.github.io/verificador-hacienda-cr/>
 
@@ -46,8 +46,10 @@ Requisitos del navegador: soporte de `fetch`, `async/await`, `Intl` y variables 
 
 ```
 VERIFICADOR/
-├── index.html                 ← LA APLICACIÓN.
-├── ACC.CONTADORES.jpg         ← Logo de ACC Contadores que muestra la cabecera.
+├── index.html                 ← LA APLICACIÓN (incluye el logo incrustado).
+├── ACC.CONTADORES.jpg         ← Logo original en alta resolución. La página NO
+│                                 lo carga; se conserva como fuente para
+│                                 regenerar la versión incrustada si hace falta.
 │
 ├── BIBLIOGRAFÍA/              ← Ocho documentos legales que la app enlaza desde
 │                                 los paneles informativos y las referencias.
@@ -64,7 +66,7 @@ VERIFICADOR/
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← 10 auditorías del DOM (ids, ARIA, alt, encabezados).
     ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
-    ├── pruebas-navegador.js   ← 47 pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-navegador.js   ← 53 pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
@@ -108,6 +110,17 @@ validar entrada  →  apiGet(ruta, parámetros)  →  render…()  →  showAler
 | 6b | CABYS por descripción | `GET /fe/cabys` | `q`, `top` | Mínimo 3 caracteres |
 
 Todos apuntan al origen `https://api.hacienda.go.cr`. No se emplea ningún servicio de terceros, ningún endpoint no documentado y ningún dato simulado.
+
+### Accesos externos de la cabecera
+
+Además de los seis módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+
+| Botón | Destino | Para qué sirve |
+|---|---|---|
+| ✅ Verificar comprobante | `ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/` | Verificador oficial de comprobantes electrónicos del Ministerio de Hacienda |
+| 💬 Asistente virtual | `josancajimenez-debug.github.io/acc-asistente/` | Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica |
+
+El Asistente virtual está también accesible desde el pie de página, junto a los datos de contacto, para quien llegue al final de una consulta y necesite acompañamiento profesional para interpretar el resultado.
 
 > **Nota.** La consulta de *tipo de cambio histórico por rango de fechas* (`/indicadores/tc/dolar/historico`) **no forma parte de la aplicación**. Llegó a implementarse y a probarse, pero el servicio del Ministerio devuelve `503 Service unavailable` de forma sostenida —falla incluso el ejemplo publicado en su propia documentación— y se retiró para no ofrecer una función que no puede funcionar. Los detalles del diagnóstico se conservan en [`PRUEBAS.md`](PRUEBAS.md). Mientras tanto, la serie histórica puede consultarse en el portal del Banco Central: <https://sdd.bccr.fi.cr/es/IndicadoresEconomicos/Inicio/Contenedor/6?Cuadro=1>
 
@@ -330,7 +343,7 @@ En pocos minutos estará disponible en `https://USUARIO.github.io/verificador-ha
 | **Cloudflare Pages** | Conecte el repositorio; sin comando de compilación, directorio raíz. |
 | **Vercel** | `vercel --prod` en la carpeta del proyecto. |
 | **Intranet o servidor propio** | Copie `index.html` a cualquier carpeta servida por Apache, IIS o Nginx. |
-| **Por correo o memoria USB** | Envíe la carpeta completa (`index.html`, el logo y `BIBLIOGRAFÍA/`); se abre con doble clic. Requiere conexión sólo para consultar la API. |
+| **Por correo o memoria USB** | Envíe `index.html` y la carpeta `BIBLIOGRAFÍA/`; se abre con doble clic. El logo va dentro del HTML. Requiere conexión sólo para consultar la API. |
 
 Se recomienda servir la aplicación por **HTTPS**: el botón «Copiar código CABYS» utiliza la API moderna del portapapeles, que muchos navegadores restringen a contextos seguros (existe un mecanismo alternativo, pero es menos fiable).
 
@@ -423,9 +436,9 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 10 | 10 correctos |
 | Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
-| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 47 | 47 correctos |
+| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 53 | 53 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **159** | **159 correctos** |
+| **Total** | **165** | **165 correctos** |
 
 Cómo ejecutarlas (Node.js 18 o superior):
 
