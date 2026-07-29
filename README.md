@@ -4,9 +4,7 @@ Aplicación web para consultar información pública mediante las **API oficiale
 
 Referencia técnica única: <https://api.hacienda.go.cr/docs>
 
-Un solo `index.html` con todo integrado —HTML, CSS, JavaScript y el logo de ACC Contadores incrustado—: sin dependencias, sin compilación y sin backend. Funciona en computadoras, tabletas y teléfonos móviles.
-
-La única dependencia externa es la carpeta `BIBLIOGRAFÍA/`, con los ocho documentos legales que enlazan los paneles informativos. Consérvela junto al HTML; sin ella la aplicación funciona igual, sólo dejan de abrirse esos enlaces.
+**Un único archivo `index.html`, verdaderamente autónomo**: HTML, CSS, JavaScript, el logo de ACC Contadores y el icono del sitio van todos dentro. Sin dependencias, sin compilación, sin backend y sin ningún archivo vecino. Funciona en computadoras, tabletas y teléfonos móviles.
 
 ---
 
@@ -30,7 +28,7 @@ La única dependencia externa es la carpeta `BIBLIOGRAFÍA/`, con los ocho docum
 
 ## 1. Puesta en marcha en 30 segundos
 
-**Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada ni levantar un servidor: la aplicación consulta directamente los servicios oficiales. Mantenga a su lado la carpeta `BIBLIOGRAFÍA/` para que funcionen los enlaces a los documentos legales.
+**Uso inmediato.** Abra `index.html` con doble clic en cualquier navegador moderno (Chrome, Edge, Firefox, Safari). No hace falta instalar nada, ni levantar un servidor, ni acompañar el archivo de ninguna carpeta: la aplicación consulta directamente los servicios oficiales.
 
 **Aplicación ya publicada:** <https://josancajimenez-debug.github.io/verificador-hacienda-cr/>
 
@@ -46,14 +44,11 @@ Requisitos del navegador: soporte de `fetch`, `async/await`, `Intl` y variables 
 
 ```
 VERIFICADOR/
-├── index.html                 ← LA APLICACIÓN (incluye el logo incrustado).
+├── index.html                 ← LA APLICACIÓN. Único archivo necesario:
+│                                 lleva dentro el código, el logo y el icono.
 ├── ACC.CONTADORES.jpg         ← Logo original en alta resolución. La página NO
 │                                 lo carga; se conserva como fuente para
 │                                 regenerar la versión incrustada si hace falta.
-│
-├── BIBLIOGRAFÍA/              ← Ocho documentos legales que la app enlaza desde
-│                                 los paneles informativos y las referencias.
-│                                 Deben acompañar al index.html.
 ├── README.md                  ← Este documento.
 ├── PRUEBAS.md                 ← Resultados y evidencia de las pruebas.
 │
@@ -121,6 +116,14 @@ Además de los seis módulos de consulta, la barra de herramientas ofrece dos ac
 | 💬 Asistente virtual | `josancajimenez-debug.github.io/acc-asistente/` | Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica |
 
 El Asistente virtual está también accesible desde el pie de página, junto a los datos de contacto, para quien llegue al final de una consulta y necesite acompañamiento profesional para interpretar el resultado.
+
+### Base normativa de los paneles informativos
+
+Cada módulo incluye un panel plegable «Significado, uso, aplicación e importancia» con la explicación de su alcance y su fundamento legal. Al pie de cada panel figuran las **citas en formato APA** de las fuentes consultadas, y al final de la página la lista completa de referencias.
+
+Las citas se presentan **como texto, no como enlaces a archivos**. La bibliografía es el respaldo documental con el que se redactaron las explicaciones; la aplicación no la distribuye. Cada norma citada es de acceso público y puede obtenerse en el sitio de la institución que la publica: el Sistema Costarricense de Información Jurídica para leyes y decretos, y el portal del Ministerio de Hacienda para las resoluciones y los anexos de facturación electrónica.
+
+Esta decisión mantiene además la propiedad más útil del proyecto: **`index.html` es un archivo verdaderamente autónomo**, que se puede enviar suelto sin que nada quede roto.
 
 > **Nota.** La consulta de *tipo de cambio histórico por rango de fechas* (`/indicadores/tc/dolar/historico`) **no forma parte de la aplicación**. Llegó a implementarse y a probarse, pero el servicio del Ministerio devuelve `503 Service unavailable` de forma sostenida —falla incluso el ejemplo publicado en su propia documentación— y se retiró para no ofrecer una función que no puede funcionar. Los detalles del diagnóstico se conservan en [`PRUEBAS.md`](PRUEBAS.md). Mientras tanto, la serie histórica puede consultarse en el portal del Banco Central: <https://sdd.bccr.fi.cr/es/IndicadoresEconomicos/Inicio/Contenedor/6?Cuadro=1>
 
@@ -343,7 +346,7 @@ En pocos minutos estará disponible en `https://USUARIO.github.io/verificador-ha
 | **Cloudflare Pages** | Conecte el repositorio; sin comando de compilación, directorio raíz. |
 | **Vercel** | `vercel --prod` en la carpeta del proyecto. |
 | **Intranet o servidor propio** | Copie `index.html` a cualquier carpeta servida por Apache, IIS o Nginx. |
-| **Por correo o memoria USB** | Envíe `index.html` y la carpeta `BIBLIOGRAFÍA/`; se abre con doble clic. El logo va dentro del HTML. Requiere conexión sólo para consultar la API. |
+| **Por correo o memoria USB** | Envíe únicamente `index.html`; se abre con doble clic y el logo va dentro. Requiere conexión sólo para consultar la API. |
 
 Se recomienda servir la aplicación por **HTTPS**: el botón «Copiar código CABYS» utiliza la API moderna del portapapeles, que muchos navegadores restringen a contextos seguros (existe un mecanismo alternativo, pero es menos fiable).
 

@@ -66,9 +66,11 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     /no encontrada/i.test(await p.locator("#alert-exoneracion .alert__title").innerText()),
     (await p.locator("#alert-exoneracion .alert__title").innerText()).trim());
 
-  // --- Todos los enlaces relativos deben resolver en el sitio publicado ---
-  // Los documentos legales viven junto al HTML: si no se publican, los enlaces
-  // funcionan en local y fallan en el sitio web sin que nadie se dé cuenta.
+  // --- Ningún enlace de la página debe quedar roto en el sitio publicado ---
+  // Un enlace relativo a un archivo que no se publica funciona en local y falla
+  // en el sitio web sin dar ninguna señal. Se recorren todos y se exige que
+  // resuelvan; si no hay ninguno, también es correcto (la página no depende de
+  // archivos vecinos).
   const relativos = await p.evaluate(() => [...new Set([...document.querySelectorAll("a[href]")]
     .map((a) => a.getAttribute("href"))
     .filter((h) => h && !/^(https?:|mailto:|tel:|#|data:)/i.test(h))
@@ -79,9 +81,12 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     const res = await p.request.get(url, { timeout: 45000 }).catch(() => null);
     if (!res || !res.ok()) rotos.push(`${decodeURIComponent(url.split("/").pop())} → ${res ? res.status() : "sin respuesta"}`);
   }
-  check("Todos los enlaces relativos resuelven en el sitio publicado",
-    relativos.length > 0 && rotos.length === 0,
-    rotos.length ? `${rotos.length} roto(s): ${rotos.slice(0, 3).join(" | ")}` : `${relativos.length} documentos verificados, todos accesibles`);
+  check("Ningún enlace relativo queda roto en el sitio publicado",
+    rotos.length === 0,
+    rotos.length ? `${rotos.length} roto(s): ${rotos.slice(0, 3).join(" | ")}`
+                 : relativos.length === 0
+                   ? "la página no enlaza archivos vecinos: nada que se pueda romper al publicar"
+                   : `${relativos.length} verificados, todos accesibles`);
 
   // --- El manual y los paneles informativos también en el sitio publicado ---
   await p.click("#btn-manual");
