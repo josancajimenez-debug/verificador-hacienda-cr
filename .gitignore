@@ -1,15 +1,35 @@
 # Materiales de trabajo que no forman parte de la aplicación publicada
 PROMT VERIFICADOR.docx
-BIBLIOGRAFÍA/
 *.docx
 
 # Paquete comprimido: se regenera; no conviene versionarlo
 verificador-hacienda-cr.zip
 
-# Archivos temporales
+# Dependencias de las pruebas
 node_modules/
+
+# Archivos temporales
 *.tmp
 *.log
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# ---------------------------------------------------------------------------
+# BIBLIOGRAFÍA
+# La aplicación enlaza ocho de estos documentos desde los paneles «Significado,
+# uso, aplicación e importancia» y desde las referencias del manual. Esos ocho
+# SÍ deben publicarse: si no, los enlaces devuelven 404 en el sitio web.
+# El resto de la carpeta queda fuera para no engordar el repositorio.
+# Se usa "BIBLIOGRAFÍA/*" (con asterisco) y no "BIBLIOGRAFÍA/", porque Git no
+# aplica excepciones con "!" dentro de un directorio excluido por completo.
+# ---------------------------------------------------------------------------
+BIBLIOGRAFÍA/*
+!BIBLIOGRAFÍA/ANEXOS Y ESTRUCTURAS_V4.4.pdf
+!BIBLIOGRAFÍA/CNPT.pdf
+!BIBLIOGRAFÍA/LEY DE IMPUESTO AL VALOR AGREGADO 6826.pdf
+!BIBLIOGRAFÍA/LIR 7092.pdf
+!BIBLIOGRAFÍA/RCNPT.pdf
+!BIBLIOGRAFÍA/REGLAMENTO_DE_COMPROBANTES_ELECTRONICOS.pdf
+!BIBLIOGRAFÍA/RL 9635.pdf
+!BIBLIOGRAFÍA/Resolución_General_sobre_disposiciones_técnicas_comprobantes_electrónicos_para_efectos_tributarios.pdf

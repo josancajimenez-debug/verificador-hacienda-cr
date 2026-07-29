@@ -4,9 +4,11 @@
   "scripts": {
     "test:logica": "node pruebas/pruebas-logica.js index.html",
     "test:api": "node pruebas/pruebas-api.js index.html",
+    "test:estructura": "node pruebas/pruebas-estructura.js index.html",
+    "test:comportamiento": "node pruebas/pruebas-comportamiento.js index.html",
     "test:navegador": "node pruebas/pruebas-navegador.js index.html pruebas/capturas",
     "test:sitio": "node pruebas/pruebas-sitio-publicado.js https://josancajimenez-debug.github.io/verificador-hacienda-cr/ pruebas/capturas",
-    "test": "npm run test:logica && npm run test:api && npm run test:navegador"
+    "test": "npm run test:logica && npm run test:api && npm run test:estructura && npm run test:comportamiento && npm run test:navegador"
   },
   "devDependencies": {
     "playwright": "^1.54.1"
