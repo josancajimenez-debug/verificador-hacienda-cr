@@ -10,9 +10,11 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
 | 3 · Estructura y accesibilidad del DOM | 13 | 13 | 0 |
 | 4 · Comportamiento (manual modal, paneles, teclado) | 16 | 16 | 0 |
-| 5 · Navegador real (Chrome) | 55 | 55 | 0 |
-| 6 · Sitio publicado (URL pública real) | 10 | 10 | 0 |
-| **Total** | **170** | **170** | **0** |
+| 5 · Calidad: memoria, seguridad y contraste | 14 | 14 | 0 |
+| 6 · Recorrido exhaustivo (45 pasos, consola limpia) | 45 | 45 | 0 |
+| 7 · Navegador real (Chrome) | 58 | 58 | 0 |
+| 8 · Sitio publicado (URL pública real) | 10 | 10 | 0 |
+| **Total** | **232** | **232** | **0** |
 
 Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
 
@@ -555,6 +557,75 @@ No es un defecto de la aplicación y **la interfaz no puede llegar a ese caso**,
 
 ---
 
+## 6 quater. Revisión integral: depuración, rendimiento y accesibilidad
+
+Revisión completa de la aplicación con dos bancos nuevos: un recorrido exhaustivo por la interfaz que no tolera ninguna excepción ni advertencia de consola, y un banco de calidad que mide memoria, seguridad y contraste.
+
+### Defectos corregidos
+
+**1. El botón «Copiar» lanzaba una excepción en cada pulsación.** El manejador es asíncrono y leía `event.currentTarget` **después** de esperar al portapapeles. Esa propiedad sólo es válida mientras el evento se está despachando: en cuanto el manejador cede el control en un `await`, pasa a `null`.
+
+```text
+TypeError: Cannot read properties of null (reading 'textContent')
+    at HTMLButtonElement.click (index.html:2334)
+```
+
+El código copiaba correctamente y el aviso flotante aparecía, de modo que el fallo pasaba inadvertido: lo único que no funcionaba era la confirmación «✔ Copiado» del propio botón. Corregido tomando el elemento del cierre en lugar del evento. Se añade además la cancelación del temporizador anterior, porque varias pulsaciones seguidas dejaban el rótulo congelado.
+
+**2. Contraste por debajo del mínimo WCAG AA en el tema claro.** La variable `--text-faint` valía `#6b7896`:
+
+| Elemento | Fondo | Antes | Ahora |
+|---|---|---:|---:|
+| Ruta del endpoint | `--bg-inset` | **3,80:1** | 4,83:1 |
+| Texto de ayuda bajo los campos | `--bg-sunken` | **4,16:1** | 5,28:1 |
+| Etiquetas de campo y barra de estado | `--bg-elev` | **4,42:1** | 5,61:1 |
+
+Se oscurece a `#5a6883`, que deja el peor caso en 4,83:1. Afectaba a los textos de ayuda, las etiquetas de resultado, la barra de estado y la ruta del endpoint.
+
+**3. Un fallo al guardar en caché podía tumbar una consulta ya resuelta.** La caché es una optimización: ahora el guardado va protegido y un problema allí deja una traza sin afectar al resultado que la persona usuaria está esperando.
+
+### Memoria y rendimiento
+
+| Aspecto | Antes | Ahora |
+|---|---|---|
+| Tamaño de la caché | Sin tope | Máximo 100 entradas, descartando las más antiguas |
+| Entradas vencidas | Sólo se borraban al reconsultar la misma URL | Barrido periódico que se detiene solo al quedar vacía |
+| Temporizadores del limitador | Uno por cada solicitud en espera | Uno solo (comprobado con 25 tareas encoladas) |
+
+La purga periódica importa por privacidad, no sólo por memoria: una consulta que nadie repite se quedaba en memoria indefinidamente con el número de identificación dentro, pese a que la aplicación promete una caché temporal.
+
+### Falsos positivos descartados
+
+Dos hallazgos iniciales resultaron ser errores de medición de las propias pruebas, no defectos de la aplicación:
+
+- **BOM del CSV.** `Blob.text()` descarta la marca de orden de bytes al decodificar UTF-8. Leyendo los bytes en crudo aparece: `EF BB BF`. La prueba se corrigió para leer el búfer.
+- **Botón principal en tema oscuro, 1,70:1.** El color se leyó mientras la transición CSS aún interpolaba, de modo que se midió el fondo del tema anterior contra el texto del nuevo. Con las transiciones desactivadas el valor real es **7,41:1**. La prueba ahora inyecta `transition:none` antes de medir.
+
+También se descartó una tanda de «símbolos sin usar» del análisis estático: el analizador trataba `//` dentro de cadenas como comentario y borraba código. Comprobado directamente sobre el archivo, las once funciones y todas las claves de configuración se utilizan.
+
+### Recorrido exhaustivo: 45 pasos sin una sola incidencia
+
+```text
+· Las seis pestañas y sus seis paneles informativos, abriendo y cerrando cada guía
+· Cuatro formularios × (envío vacío + 3 a 5 valores inválidos + valor válido)
+· Limpiar y Nueva consulta en cada módulo
+· CABYS: código válido, código inexistente, descripción, filtro,
+  orden por las cinco columnas en ambos sentidos, paginación completa,
+  copiado, exportación CSV y descripción demasiado corta
+· Tipo de cambio: consulta y limpieza
+· Doble clic sobre Consultar
+· Manual: apertura, los seis enlaces del índice y cierre con Escape
+· Tema: ciclo completo de los tres modos
+· Configuración: guardar, proxy inválido, proxy inseguro y restablecer
+· Limpiar caché
+· Pérdida de conexión y recuperación
+· 60 pulsaciones de Tab por toda la interfaz
+```
+
+Resultado: **ninguna excepción, ningún error ni advertencia de consola, ningún paso fallido.**
+
+---
+
 ## 7. Reproducción de las pruebas
 
 ```bash
@@ -568,7 +639,18 @@ node pruebas/pruebas-api.js index.html
 npm install playwright
 node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
 
-# Bancos 3 y 4 — estructura, accesibilidad y comportamiento
+# Todos los bancos locales de una vez
+npm test
+
+# O uno a uno:
+npm run test:logica         # validadores y normalizadores
+npm run test:api            # integración contra la API real
+npm run test:estructura     # DOM, ARIA, anidamiento
+npm run test:comportamiento # manual modal, paneles, teclado
+npm run test:calidad        # memoria, seguridad y contraste
+npm run test:recorrido      # 45 pasos, sin tolerar errores de consola
+npm run test:navegador      # interfaz completa y capturas
+npm run test:sitio          # contra la URL pública ya desplegada
 node pruebas/pruebas-estructura.js index.html
 node pruebas/pruebas-comportamiento.js index.html
 

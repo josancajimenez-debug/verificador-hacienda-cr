@@ -61,7 +61,9 @@ VERIFICADOR/
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
     ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
-    ├── pruebas-navegador.js   ← 55 pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-navegador.js   ← 58 pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-calidad.js     ← 14 pruebas de memoria, seguridad y contraste.
+    ├── pruebas-recorrido.js   ← 45 pasos por toda la interfaz, sin tolerar errores.
     ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
@@ -439,9 +441,11 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
 | Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
-| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 55 | 55 correctos |
+| Calidad: memoria, seguridad y contraste | 14 | 14 correctos |
+| Recorrido exhaustivo (45 pasos, consola limpia) | 45 | 45 correctos |
+| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **170** | **170 correctos** |
+| **Total** | **232** | **232 correctos** |
 
 Cómo ejecutarlas (Node.js 18 o superior):
 
