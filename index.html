@@ -3331,6 +3331,21 @@ function renderExoneracion(d, autorizacion) {
  * derivada del nombre de la propiedad. No se inventa ningún campo.
  */
 const ETIQUETAS_REGISTRO = {
+  /* --- Campos observados en respuestas reales de /fe/pesca --------------- */
+  listaDatosMAG: "🌾 Registro del MAG",
+  listaDatosIncopesca: "🐟 Permisos de INCOPESCA",
+  listaDatosAcuicultores: "🦐 Registro de acuicultores",
+  nombrePermisonarioIncopesca: "Nombre del permisionario",
+  fechaVenceIncopesca: "Vence el",
+  indicadorActivoIncopesca: "Activo",
+  nombreProductorMAG: "Nombre de la persona productora",
+  fechaVenceMAG: "Vence el",
+  indicadorActivoMAG: "Activo",
+  nombreAcuicultor: "Nombre del acuicultor",
+  fechaVenceAcuicultor: "Vence el",
+  indicadorActivoAcuicultor: "Activo",
+
+  /* --- Campos genéricos -------------------------------------------------- */
   identificacion: "Identificación",
   tipoIdentificacion: "Tipo de identificación",
   nombre: "Nombre o razón social",
@@ -3399,69 +3414,185 @@ function crearModuloRegistro(cfg) {
   });
 }
 
+/**
+ * Cuenta los registros con contenido real dentro de la respuesta.
+ *
+ * Importa porque el servicio agrupa la información en varias listas y puede
+ * devolverlas TODAS VACÍAS. Comprobar sólo que el objeto tenga claves haría
+ * anunciar «Registro encontrado» sin un solo dato detrás.
+ *
+ * @returns {{total:number, listas:Array<{clave:string, filas:Array}>}}
+ */
+function contarRegistros(datos) {
+  if (Array.isArray(datos)) return { total: datos.length, listas: [{ clave: "", filas: datos }] };
+  if (!datos || typeof datos !== "object") return { total: 0, listas: [] };
+
+  const listas = [];
+  let total = 0;
+  for (const [clave, valor] of Object.entries(datos)) {
+    if (!Array.isArray(valor)) continue;
+    listas.push({ clave, filas: valor });
+    total += valor.length;
+  }
+  // Objeto sin listas: se trata como un único registro si tiene algún dato
+  if (listas.length === 0) {
+    const conDatos = Object.values(datos).some((v) => hasValue(v));
+    return { total: conDatos ? 1 : 0, listas: [{ clave: "", filas: [datos] }] };
+  }
+  return { total, listas };
+}
+
+/**
+ * Determina la vigencia de un registro a partir de los campos que devuelve el
+ * servicio: un indicador de actividad y una fecha de vencimiento.
+ *
+ * Se aplica un criterio conservador: sólo se declara vigente cuando el
+ * indicador es afirmativo Y la fecha de vencimiento no ha pasado. Ante la
+ * duda, no se afirma la vigencia.
+ *
+ * @returns {{estado:"vigente"|"no-vigente"|"desconocida", motivo:string}}
+ */
+function evaluarVigencia(fila) {
+  let activo = null;
+  let vence = null;
+
+  for (const [clave, valor] of Object.entries(fila)) {
+    if (typeof valor === "boolean" && /activ/i.test(clave)) activo = valor;
+    if (typeof valor === "string" && /vence|vencimiento|expira/i.test(clave)) vence = isoDatePart(valor);
+  }
+
+  if (activo === null && vence === null) return { estado: "desconocida", motivo: "" };
+
+  const vencida = vence !== null && vence < hoyISO();
+  if (activo === false && vencida) return { estado: "no-vigente", motivo: `marcado como inactivo y vencido el ${fmtFecha(vence)}` };
+  if (activo === false) return { estado: "no-vigente", motivo: "marcado como inactivo por la institución" };
+  if (vencida) return { estado: "no-vigente", motivo: `vencido el ${fmtFecha(vence)}` };
+  if (activo === true) return { estado: "vigente", motivo: vence ? `activo, vence el ${fmtFecha(vence)}` : "activo" };
+  return { estado: "desconocida", motivo: "" };
+}
+
 function renderRegistro(cfg, datos, identificacion) {
   const out = $(cfg.outId);
   clearNode(out);
 
-  // Respuesta vacía o sin contenido útil: no se afirma nada
-  const vacio = !datos
-    || (Array.isArray(datos) && datos.length === 0)
-    || (typeof datos === "object" && !Array.isArray(datos) && Object.keys(datos).length === 0);
+  const { total, listas } = contarRegistros(datos);
 
-  if (vacio) {
+  // Sin registros con contenido: no se afirma absolutamente nada.
+  if (total === 0) {
     showAlert(cfg.alertId, "warn", cfg.tituloNoEncontrado,
-      `El servicio respondió sin datos para la identificación ${identificacion}. ` + cfg.textoNoEncontrado,
+      `El servicio respondió sin registros para la identificación ${identificacion}. ` + cfg.textoNoEncontrado,
       null, cfg.portal);
     return;
   }
+
+  // Vigencia del conjunto: sólo se declara favorable si algún registro lo está.
+  const vigencias = listas.flatMap((l) => l.filas.filter((f) => f && typeof f === "object").map(evaluarVigencia));
+  const algunoVigente = vigencias.some((v) => v.estado === "vigente");
+  const algunoNoVigente = vigencias.some((v) => v.estado === "no-vigente");
+  const seConoce = vigencias.some((v) => v.estado !== "desconocida");
 
   out.appendChild(encabezadoResultado(cfg.tituloResultado));
 
   const cabecera = el("div", { className: "dl" });
   cabecera.appendChild(dlItem("Identificación consultada", identificacion, { mono: true }));
-  cabecera.appendChild(dlItem("Resultado de la consulta", "Registro encontrado", { badge: "ok" }));
+  cabecera.appendChild(dlItem("Resultado de la consulta",
+    `Figura en el registro (${total} ${total === 1 ? "asiento" : "asientos"})`, { badge: "neutral" }));
+
+  if (seConoce) {
+    cabecera.appendChild(dlItem("Condición",
+      algunoVigente ? "Con registro vigente" : "Sin registro vigente",
+      { badge: algunoVigente ? "ok" : "err",
+        nota: algunoVigente
+          ? "Al menos un asiento figura activo y sin vencer."
+          : "Ningún asiento figura activo y sin vencer." }));
+  }
   cabecera.appendChild(dlItem("Institución o registro relacionado", cfg.institucion, { full: true }));
   out.appendChild(cabecera);
 
+  // Aviso destacado cuando figura pero sin vigencia: es el caso que más se
+  // presta a una lectura equivocada, porque «aparece en el registro» se puede
+  // confundir con «puede recibir el tratamiento tributario correspondiente».
+  if (seConoce && !algunoVigente && algunoNoVigente) {
+    const motivos = [...new Set(vigencias.filter((v) => v.motivo).map((v) => v.motivo))];
+    showAlert(cfg.alertId, "err", "Figura en el registro, pero sin vigencia",
+      "La identificación aparece en el registro, aunque ningún asiento está activo y sin vencer. " +
+      "Aparecer no equivale a estar habilitado: no aplique tarifas reducidas ni tratamientos reservados " +
+      "a personas con registro vigente sin confirmarlo con la institución.",
+      motivos.length ? "Detalle: " + motivos.join("; ") + "." : null,
+      cfg.portal);
+  }
+
   out.appendChild(el("h4", { className: "subhead", text: "📋 Datos devueltos por el servicio" }));
 
-  if (Array.isArray(datos)) {
-    const objetos = datos.filter((x) => x && typeof x === "object" && !Array.isArray(x));
-    if (objetos.length === datos.length && datos.length > 0) {
-      const claves = [...new Set(datos.flatMap((o) => Object.keys(o)))];
-      const tabla = new DataTable({
-        columns: claves.map((k) => ({
-          key: k,
-          label: ETIQUETAS_REGISTRO[k] || humanizeKey(k),
-          mono: /codigo|identificacion/i.test(k),
-          format: (v) => {
-            if (v === null || v === undefined) return "";
-            if (typeof v === "boolean") return v ? "Sí" : "No";
-            if (typeof v === "object") return JSON.stringify(v);
-            if (typeof v === "string" && isoDatePart(v)) return fmtFecha(v);
-            return v;
-          }
-        })),
-        rows: datos,
-        pageSize: 25,
-        csvName: `${cfg.csvBase}_${identificacion}`
-      });
-      out.appendChild(tabla.root);
-    } else {
-      out.appendChild(el("pre", { className: "raw", text: JSON.stringify(datos, null, 2) }));
+  // Cada lista con contenido se presenta por separado: proceden de registros
+  // distintos (MAG, INCOPESCA y acuicultores) y mezclarlas induciría a error.
+  for (const { clave, filas } of listas) {
+    if (filas.length === 0) continue;
+
+    if (clave) {
+      out.appendChild(el("h5", { className: "subhead",
+        text: (ETIQUETAS_REGISTRO[clave] || humanizeKey(clave)) + ` · ${filas.length} ${filas.length === 1 ? "asiento" : "asientos"}` }));
     }
-  } else {
-    out.appendChild(renderObjetoGenerico(datos, ETIQUETAS_REGISTRO));
+
+    const objetos = filas.filter((x) => x && typeof x === "object" && !Array.isArray(x));
+    if (objetos.length !== filas.length) {
+      out.appendChild(el("pre", { className: "raw", text: JSON.stringify(filas, null, 2) }));
+      continue;
+    }
+
+    const claves = [...new Set(filas.flatMap((o) => Object.keys(o)))];
+    const columnas = claves.map((k) => ({
+      key: k,
+      label: ETIQUETAS_REGISTRO[k] || humanizeKey(k),
+      mono: /codigo|identificacion/i.test(k),
+      format: (v) => {
+        if (v === null || v === undefined || v === "") return "—";
+        if (typeof v === "boolean") return v ? "Sí" : "No";
+        if (typeof v === "object") return JSON.stringify(v);
+        if (typeof v === "string" && isoDatePart(v)) return fmtFecha(v);
+        return v;
+      }
+    }));
+
+    // Columna calculada con la vigencia, para que no haya que interpretar a
+    // mano un indicador booleano junto a una fecha.
+    columnas.push({
+      key: "_vigencia",
+      label: "Vigencia (cálculo local)",
+      format: (_, fila) => {
+        const v = evaluarVigencia(fila);
+        if (v.estado === "vigente") return "Vigente";
+        if (v.estado === "no-vigente") return "No vigente";
+        return "No determinable";
+      }
+    });
+
+    out.appendChild(new DataTable({
+      columns: columnas,
+      rows: filas,
+      pageSize: 25,
+      csvName: `${cfg.csvBase}_${clave || "registro"}_${identificacion}`
+    }).root);
   }
 
   out.appendChild(el("p", { className: "hint",
-    text: "Las etiquetas mostradas se derivan de los nombres de los campos devueltos por la API oficial. " +
-          "Esta aplicación no agrega, completa ni interpreta información que el servicio no haya suministrado." }));
+    text: "La vigencia se determina con los campos que devuelve el servicio: el indicador de actividad y la " +
+          "fecha de vencimiento. Sólo se declara vigente un asiento activo y sin vencer; ante cualquier duda " +
+          "no se afirma la vigencia. Esta aplicación no agrega ni completa información que el servicio no haya " +
+          "suministrado." }));
 
   out.appendChild(bloqueCrudo(datos));
 
-  showAlert(cfg.alertId, "ok", "Registro encontrado",
-    "La información proviene del Ministerio de Hacienda de Costa Rica.");
+  // El aviso favorable sólo se emite cuando hay vigencia; si no la hay, el
+  // mensaje de advertencia ya se mostró más arriba y no debe sobrescribirse.
+  if (algunoVigente || !seConoce) {
+    showAlert(cfg.alertId, algunoVigente ? "ok" : "info",
+      algunoVigente ? "Registro vigente encontrado" : "Registro encontrado",
+      algunoVigente
+        ? "La identificación figura con al menos un asiento activo y sin vencer, según el Ministerio de Hacienda."
+        : "La identificación figura en el registro. El servicio no informó indicador de actividad ni fecha de " +
+          "vencimiento, de modo que esta consulta no permite afirmar que el registro esté vigente.");
+  }
 }
 
 function initAgro() {
@@ -3499,9 +3630,9 @@ function initPesca() {
     tituloResultado: "Registro pesquero y acuícola",
     tituloNoEncontrado: "No figura en el registro consultado",
     textoNoEncontrado:
-      "Esto significa que no aparece vinculada a actividades pesqueras o acuícolas en la información que " +
-      "publica el Ministerio de Hacienda. Verifique el número de identificación; la ausencia de datos no " +
-      "constituye por sí sola una certificación oficial."
+      "El servicio consulta tres registros a la vez —MAG, INCOPESCA y acuicultores— y ninguno devolvió " +
+      "asientos para esta identificación. Verifique el número; la ausencia de datos no constituye por sí " +
+      "sola una certificación oficial."
   });
 }
 

@@ -150,6 +150,60 @@ check("cabys-parse", "conserva el total informado por la API",
 check("cabys-parse", "arreglo vacío (código inexistente)", ec([]).items.length, 0);
 check("cabys-parse", "estructura no reconocida devuelve null", ec("texto suelto"), null);
 
+/* ======= 7. REGISTROS PESQUERO Y AGROPECUARIO (estructura real) ========== */
+/*
+ * Forma observada en una respuesta real de /fe/pesca: tres listas, una por
+ * registro. Los datos de los ejemplos son ficticios; sólo se reproduce la
+ * estructura y los nombres de los campos.
+ */
+const cr = g("contarRegistros");
+const ev = g("evaluarVigencia");
+const hoy = g("hoyISO")();
+const anioPasado = (Number(hoy.slice(0, 4)) - 1) + hoy.slice(4);
+const anioFuturo = (Number(hoy.slice(0, 4)) + 1) + hoy.slice(4);
+
+const RESPUESTA_VACIA = { listaDatosMAG: [], listaDatosIncopesca: [], listaDatosAcuicultores: [] };
+const RESPUESTA_CON_DATOS = {
+  listaDatosMAG: [],
+  listaDatosIncopesca: [{
+    nombrePermisonarioIncopesca: "NOMBRE DE EJEMPLO",
+    fechaVenceIncopesca: anioPasado,
+    indicadorActivoIncopesca: false
+  }],
+  listaDatosAcuicultores: []
+};
+
+// El caso decisivo: tres listas presentes pero TODAS vacías. Comprobar sólo
+// que el objeto tenga claves haría anunciar «registro encontrado» sin datos.
+check("registros", "tres listas vacías cuentan como cero registros", cr(RESPUESTA_VACIA).total, 0);
+check("registros", "conserva las tres listas aunque estén vacías", cr(RESPUESTA_VACIA).listas.length, 3);
+check("registros", "cuenta los asientos con contenido", cr(RESPUESTA_CON_DATOS).total, 1);
+check("registros", "un arreglo simple se cuenta por su longitud", cr([{ a: 1 }, { a: 2 }]).total, 2);
+check("registros", "objeto suelto con datos cuenta como un asiento", cr({ nombre: "X" }).total, 1);
+check("registros", "objeto suelto sin datos cuenta como cero", cr({ nombre: "", otro: null }).total, 0);
+check("registros", "null cuenta como cero", cr(null).total, 0);
+
+check("vigencia", "inactivo y vencido no es vigente",
+  ev({ indicadorActivoIncopesca: false, fechaVenceIncopesca: anioPasado }).estado, "no-vigente");
+check("vigencia", "activo pero vencido no es vigente",
+  ev({ indicadorActivoIncopesca: true, fechaVenceIncopesca: anioPasado }).estado, "no-vigente");
+check("vigencia", "inactivo aunque no haya vencido no es vigente",
+  ev({ indicadorActivoIncopesca: false, fechaVenceIncopesca: anioFuturo }).estado, "no-vigente");
+check("vigencia", "activo y sin vencer sí es vigente",
+  ev({ indicadorActivoIncopesca: true, fechaVenceIncopesca: anioFuturo }).estado, "vigente");
+check("vigencia", "sin indicadores no se afirma nada",
+  ev({ nombrePermisonarioIncopesca: "X" }).estado, "desconocida");
+check("vigencia", "el motivo explica por qué no está vigente",
+  /inactivo y vencido/.test(ev({ indicadorActivoIncopesca: false, fechaVenceIncopesca: anioPasado }).motivo), true);
+check("vigencia", "reconoce los campos del registro del MAG",
+  ev({ indicadorActivoMAG: true, fechaVenceMAG: anioFuturo }).estado, "vigente");
+
+check("etiquetas", "las tres listas tienen etiqueta propia",
+  ["listaDatosMAG", "listaDatosIncopesca", "listaDatosAcuicultores"]
+    .every((k) => typeof g("ETIQUETAS_REGISTRO")[k] === "string"), true);
+check("etiquetas", "los campos de INCOPESCA tienen etiqueta legible",
+  g("ETIQUETAS_REGISTRO").nombrePermisonarioIncopesca, "Nombre del permisionario");
+
 /* ======================= 8. CONSTRUCCIÓN DE URL ========================== */
 const bu = g("buildUrl");
 check("url", "sin parámetros", bu("/indicadores/tc/dolar", {}), "https://api.hacienda.go.cr/indicadores/tc/dolar");
