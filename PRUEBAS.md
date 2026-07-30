@@ -8,11 +8,11 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 |---|---:|---:|---:|
 | 1 · Lógica pura | 60 | 60 | 0 |
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
-| 3 · Estructura y accesibilidad del DOM | 10 | 10 | 0 |
+| 3 · Estructura y accesibilidad del DOM | 13 | 13 | 0 |
 | 4 · Comportamiento (manual modal, paneles, teclado) | 16 | 16 | 0 |
-| 5 · Navegador real (Chrome) | 53 | 53 | 0 |
+| 5 · Navegador real (Chrome) | 55 | 55 | 0 |
 | 6 · Sitio publicado (URL pública real) | 10 | 10 | 0 |
-| **Total** | **165** | **165** | **0** |
+| **Total** | **170** | **170** | **0** |
 
 Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
 

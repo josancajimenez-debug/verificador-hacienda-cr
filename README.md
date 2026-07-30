@@ -59,9 +59,9 @@ VERIFICADOR/
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
     ├── pruebas-logica.js      ← 60 pruebas de validadores y normalizadores.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
-    ├── pruebas-estructura.js  ← 10 auditorías del DOM (ids, ARIA, alt, encabezados).
+    ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
     ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
-    ├── pruebas-navegador.js   ← 53 pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-navegador.js   ← 55 pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
@@ -437,11 +437,11 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 |---|---|---|
 | Lógica pura (validadores, normalizadores, clasificadores) | 60 | 60 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
-| Estructura y accesibilidad del DOM | 10 | 10 correctos |
+| Estructura y accesibilidad del DOM | 13 | 13 correctos |
 | Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
-| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 53 | 53 correctos |
+| Navegador real (Chrome: interfaz, accesibilidad, móvil) | 55 | 55 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **165** | **165 correctos** |
+| **Total** | **170** | **170 correctos** |
 
 Cómo ejecutarlas (Node.js 18 o superior):
 
