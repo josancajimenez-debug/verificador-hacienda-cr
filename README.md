@@ -57,7 +57,7 @@ VERIFICADOR/
 │   └── server.js              ← Proxy equivalente en Node.js, sin dependencias.
 │
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
-    ├── pruebas-logica.js      ← 60 pruebas de validadores y normalizadores.
+    ├── pruebas-logica.js      ← 76 pruebas de validadores, normalizadores y registros.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
     ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
@@ -437,7 +437,7 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 
 | Banco | Casos | Resultado |
 |---|---|---|
-| Lógica pura (validadores, normalizadores, clasificadores) | 60 | 60 correctos |
+| Lógica pura (validadores, normalizadores, clasificadores) | 76 | 76 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
 | Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
@@ -445,7 +445,7 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Recorrido exhaustivo (45 pasos, consola limpia) | 45 | 45 correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **232** | **232 correctos** |
+| **Total** | **248** | **248 correctos** |
 
 ### Pruebas automáticas en cada publicación
 
@@ -520,7 +520,22 @@ Además, el módulo **recuerda la caída durante 10 minutos**: si el servicio ac
 **2. `/fe/agropecuario` y `/fe/pesca` devuelven HTTP 200 al no encontrar registro.**
 El cuerpo contiene `{"title":"Not Found","status":404}`. Una aplicación que sólo mirase el código HTTP mostraría ese error como si fuera un resultado válido. La función `detectarErrorIncrustado()` lo intercepta.
 
-**3. No se localizó ningún caso positivo en los registros agropecuario y pesquero.**
+**3 bis. El registro pesquero ya está verificado con datos reales.**
+Con dos identificaciones que sí figuran ante INCOPESCA se pudo observar por fin la respuesta de `/fe/pesca` cuando hay datos. Devuelve **tres registros en una sola respuesta**, cada uno con su indicador de actividad y su fecha de vencimiento:
+
+```json
+{ "listaDatosMAG": [],
+  "listaDatosIncopesca": [ { "nombrePermisonarioIncopesca": "…",
+                             "fechaVenceIncopesca": "2023-06-28",
+                             "indicadorActivoIncopesca": false } ],
+  "listaDatosAcuicultores": [] }
+```
+
+Esto obligó a corregir un **defecto grave**: la aplicación anunciaba «Registro encontrado» con distintivo verde para un permiso inactivo y vencido. En un despacho contable esa lectura induce a aplicar la tarifa reducida del 1 % a quien ya no tiene derecho. **Figurar en el registro no equivale a estar habilitado.**
+
+La aplicación distingue ahora ambas cosas: el resultado indica «Figura en el registro (N asientos)» con distintivo neutro y, aparte, la **condición**, en verde sólo si algún asiento está activo y sin vencer. Si figura sin vigencia, un aviso en rojo explica el motivo concreto y advierte de no aplicar tratamientos reservados sin confirmarlo con la institución. El criterio es conservador: vigente sólo si el indicador es afirmativo **y** la fecha no ha pasado.
+
+**3. Del registro agropecuario sigue sin observarse un caso positivo.**
 Se probaron treinta y tantas identificaciones, incluida la que la propia documentación oficial usa como ejemplo (`2100042005`), cooperativas agrícolas y cédulas jurídicas y físicas variadas: todas devolvieron «no encontrado». Los registros parecen contener únicamente productores efectivamente inscritos. En consecuencia, la ruta de presentación de un resultado positivo se implementó de forma **genérica y defensiva**: se muestran los campos que efectivamente lleguen, con etiquetas derivadas del nombre de cada propiedad, sin agregar ni suponer ningún campo. Esta ruta no pudo ejercitarse con datos reales y así se hace constar.
 
 *Vías exploradas para obtener un caso positivo, y por qué no prosperaron:*
