@@ -42,7 +42,10 @@ const sandbox = {
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
   fetch: globalThis.fetch.bind(globalThis),          // fetch REAL de Node 18+
   AbortController, URL, URLSearchParams, Blob: class {}, Intl, Date, Math, JSON,
-  setTimeout, clearTimeout, Promise, TypeError, Error
+  // El navegador siempre ofrece los cuatro temporizadores; el entorno simulado
+  // debe hacerlo también, porque la caché programa un barrido periódico.
+  setTimeout, clearTimeout, setInterval, clearInterval,
+  Promise, TypeError, Error
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);

@@ -8,7 +8,9 @@
     "test:comportamiento": "node pruebas/pruebas-comportamiento.js index.html",
     "test:navegador": "node pruebas/pruebas-navegador.js index.html pruebas/capturas",
     "test:sitio": "node pruebas/pruebas-sitio-publicado.js https://josancajimenez-debug.github.io/verificador-hacienda-cr/ pruebas/capturas",
-    "test": "npm run test:logica && npm run test:api && npm run test:estructura && npm run test:comportamiento && npm run test:navegador"
+    "test": "npm run test:logica && npm run test:api && npm run test:estructura && npm run test:comportamiento && npm run test:calidad && npm run test:recorrido && npm run test:navegador",
+    "test:recorrido": "node pruebas/pruebas-recorrido.js index.html",
+    "test:calidad": "node pruebas/pruebas-calidad.js index.html"
   },
   "devDependencies": {
     "playwright": "^1.54.1"

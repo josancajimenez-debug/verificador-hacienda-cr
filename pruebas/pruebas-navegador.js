@@ -280,11 +280,39 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     'aria-sort="ascending"');
 
   await ctx.grantPermissions(["clipboard-read", "clipboard-write"]);
-  await page.locator("#out-cabys table.data tbody tr").first().locator("button").click();
+  const excepcionesCopia = [];
+  const capturaCopia = (e) => excepcionesCopia.push(e.message);
+  page.on("pageerror", capturaCopia);
+
+  const btnCopiar = page.locator("#out-cabys table.data tbody tr").first().locator("button");
+  const rotuloOriginal = (await btnCopiar.textContent()).trim();
+  await btnCopiar.click();
   await esperar(300);
   const portapapeles = await page.evaluate(() => navigator.clipboard.readText());
   check("M6 · el botón copia el código CABYS al portapapeles",
     /^\d{13}$/.test(portapapeles), `portapapeles = "${portapapeles}"`);
+
+  // El aviso visual fallaba sin que nadie lo notara: el manejador leía
+  // event.currentTarget después de un await, cuando ya vale null.
+  const rotuloTrasCopiar = (await btnCopiar.textContent()).trim();
+  check("M6 · el botón confirma visualmente el copiado",
+    /Copiado/i.test(rotuloTrasCopiar) && excepcionesCopia.length === 0,
+    `«${rotuloOriginal}» → «${rotuloTrasCopiar}»` + (excepcionesCopia.length ? ` · EXCEPCIÓN: ${excepcionesCopia[0]}` : " · sin excepciones"));
+
+  await esperar(1600);
+  const rotuloRestaurado = (await btnCopiar.textContent()).trim();
+  check("M6 · el botón recupera su rótulo original",
+    rotuloRestaurado === rotuloOriginal, `«${rotuloTrasCopiar}» → «${rotuloRestaurado}»`);
+
+  // Pulsaciones seguidas: el rótulo no debe quedarse congelado en «Copiado»
+  await btnCopiar.click(); await esperar(150);
+  await btnCopiar.click(); await esperar(150);
+  await btnCopiar.click(); await esperar(1700);
+  const rotuloTrasVarias = (await btnCopiar.textContent()).trim();
+  check("M6 · pulsaciones repetidas no dejan el rótulo congelado",
+    rotuloTrasVarias === rotuloOriginal && excepcionesCopia.length === 0,
+    `tras 3 clics seguidos: «${rotuloTrasVarias}»`);
+  page.off("pageerror", capturaCopia);
 
   await page.screenshot({ path: path.join(SHOTS, "04-cabys-escritorio.png") });
 

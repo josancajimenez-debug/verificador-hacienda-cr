@@ -88,7 +88,11 @@
   --bg-inset:#eaeef6;
   --text:#14203c;
   --text-soft:#4a5878;
-  --text-faint:#6b7896;
+  /* Oscurecido desde #6b7896: aquel valor quedaba por debajo del mínimo AA
+     (4,5:1) en los cuatro fondos claros, y bajaba a 3,80:1 sobre --bg-inset,
+     que es donde se muestra la ruta del endpoint. Afecta a los textos de
+     ayuda, las etiquetas de campo y la barra de estado. */
+  --text-faint:#5a6883;
   --border:#d3daea;
   --border-strong:#b6c1da;
   --accent:#1e3a75;
@@ -1770,6 +1774,45 @@ const ACTIVIDAD_TIPO   = { "P": "Principal", "S": "Secundaria" };
  */
 const cache = new Map();   // url -> { time:number, data:any }
 
+/**
+ * Tope de entradas. Una búsqueda por descripción en CABYS puede devolver cien
+ * registros con su jerarquía de categorías, así que sin límite una sesión
+ * larga acumularía memoria sin necesidad. Al superarlo se descartan las
+ * entradas más antiguas: Map conserva el orden de inserción.
+ */
+const CACHE_MAX_ENTRADAS = 100;
+
+/** Cada cuánto se barren las entradas caducadas. */
+const CACHE_INTERVALO_PURGA_MS = 30000;
+let purgaProgramada = null;
+
+/**
+ * Elimina las entradas vencidas.
+ *
+ * No basta con descartarlas al leerlas: una consulta que nadie repite se
+ * quedaría en memoria indefinidamente, y esas entradas contienen los números
+ * de identificación consultados. La aplicación promete una caché temporal, de
+ * modo que el vencimiento debe cumplirse aunque no haya actividad.
+ */
+function purgarCaduco() {
+  const ahora = Date.now();
+  let eliminadas = 0;
+  for (const [url, entrada] of cache) {
+    if (ahora - entrada.time > prefs.ttl) { cache.delete(url); eliminadas++; }
+  }
+  if (eliminadas > 0) updateCacheCount();
+  if (cache.size === 0 && purgaProgramada !== null) {
+    clearInterval(purgaProgramada);
+    purgaProgramada = null;
+  }
+}
+
+/** Activa el barrido periódico, y sólo mientras haya algo que barrer. */
+function programarPurga() {
+  if (purgaProgramada !== null || prefs.ttl <= 0) return;
+  purgaProgramada = setInterval(purgarCaduco, CACHE_INTERVALO_PURGA_MS);
+}
+
 function cacheGet(url) {
   if (prefs.ttl <= 0) return null;
   const hit = cache.get(url);
@@ -1778,14 +1821,28 @@ function cacheGet(url) {
   return hit.data;
 }
 
+/**
+ * Guarda una respuesta en la caché.
+ *
+ * La caché es una optimización: si algo falla al guardar, la consulta ya
+ * resuelta debe entregarse igualmente. Por eso el cuerpo va protegido y un
+ * fallo aquí sólo deja una traza en la consola.
+ */
 function cacheSet(url, data) {
   if (prefs.ttl <= 0) return;
-  cache.set(url, { time: Date.now(), data });
-  updateCacheCount();
+  try {
+    cache.set(url, { time: Date.now(), data });
+    while (cache.size > CACHE_MAX_ENTRADAS) cache.delete(cache.keys().next().value);
+    programarPurga();
+    updateCacheCount();
+  } catch (e) {
+    console.warn("[caché] no se pudo almacenar la respuesta; la consulta continúa:", e);
+  }
 }
 
 function cacheClear() {
   cache.clear();
+  if (purgaProgramada !== null) { clearInterval(purgaProgramada); purgaProgramada = null; }
   probeState.ok = null;
   probeState.time = 0;
   updateCacheCount();
@@ -1816,6 +1873,7 @@ const limiter = {
   active: 0,
   lastStart: 0,
   queue: [],
+  _temporizador: null,
 
   run(task) {
     return new Promise((resolve, reject) => {
@@ -1827,7 +1885,14 @@ const limiter = {
   _pump() {
     if (this.queue.length === 0 || this.active >= this.maxConcurrent) return;
     const wait = Math.max(0, this.minIntervalMs - (Date.now() - this.lastStart));
-    if (wait > 0) { setTimeout(() => this._pump(), wait); return; }
+    if (wait > 0) {
+      // Un único temporizador pendiente. Sin esta guarda, cada solicitud en
+      // espera programaba el suyo y una ráfaga dejaba decenas de
+      // temporizadores redundantes disparando a la vez.
+      if (this._temporizador !== null) return;
+      this._temporizador = setTimeout(() => { this._temporizador = null; this._pump(); }, wait);
+      return;
+    }
 
     const item = this.queue.shift();
     this.active++;
@@ -2167,6 +2232,9 @@ function detectarErrorIncrustado(datos) {
  */
 
 class DataTable {
+  /** Rótulo del botón de copiado; se restaura tras el aviso de confirmación. */
+  static ETIQUETA_COPIAR = "📋 Copiar";
+
   /**
    * @param {Object} cfg
    *   columns   [{ key, label, align?, mono?, format?(v,row), sortValue?(row), csv?(v,row) }]
@@ -2321,25 +2389,31 @@ class DataTable {
         }
         if (this.copyKey) {
           const val = String(row[this.copyKey] ?? "");
-          const td = el("td", { dataset: { label: "Acción" } }, [
-            el("button", {
-              className: "btn btn--sm",
-              attrs: { type: "button", "aria-label": `Copiar ${val}` },
-              on: {
-                click: async (e) => {
-                  const ok = await copyText(val);
-                  toast(ok ? `Código ${val} copiado` : "No se pudo copiar");
-                  if (ok) {
-                    const b = e.currentTarget;
-                    const prev = b.textContent;
-                    b.textContent = "✔ Copiado";
-                    setTimeout(() => { b.textContent = prev; }, 1400);
-                  }
-                }
-              }
-            }, ["📋 Copiar"])
-          ]);
-          tr.appendChild(td);
+          const boton = el("button", {
+            className: "btn btn--sm",
+            attrs: { type: "button", "aria-label": `Copiar ${val}` }
+          }, [DataTable.ETIQUETA_COPIAR]);
+
+          boton.addEventListener("click", async () => {
+            // El elemento se toma del cierre, no de event.currentTarget: esa
+            // propiedad sólo es válida mientras el evento se está despachando
+            // y pasa a null en cuanto el manejador espera en un await, de modo
+            // que leerla después lanzaba una excepción y el aviso visual del
+            // botón nunca llegaba a mostrarse.
+            const ok = await copyText(val);
+            toast(ok ? `Código ${val} copiado` : "No se pudo copiar el código");
+            if (!ok) return;
+
+            // Si se pulsa varias veces seguidas, se cancela el temporizador
+            // anterior; de lo contrario el rótulo podía quedarse en «Copiado».
+            clearTimeout(boton._temporizadorCopia);
+            boton.textContent = "✔ Copiado";
+            boton._temporizadorCopia = setTimeout(() => {
+              boton.textContent = DataTable.ETIQUETA_COPIAR;
+            }, 1400);
+          });
+
+          tr.appendChild(el("td", { dataset: { label: "Acción" } }, [boton]));
         }
         tbody.appendChild(tr);
       }
