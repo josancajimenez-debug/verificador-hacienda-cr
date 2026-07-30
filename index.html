@@ -238,12 +238,12 @@ a{ color:var(--accent); }
 .header-tools{
   width:100%;
   display:grid;
-  /* Cinco herramientas en una sola fila. Con un mínimo de 128 px la quinta
-     bajaba sola a una segunda fila dentro de la columna de ~656 px que le
-     asigna la rejilla del encabezado; con 112 px caben las cinco repartidas
+  /* Seis herramientas en una sola fila. Con un mínimo de 112 px la sexta
+     bajaba sola a una segunda fila dentro de la columna del encabezado;
+     con 96 px caben las seis repartidas
      por igual. Sigue siendo auto-fit para que se reordene solo si en el futuro
      se añade o se quita alguna. */
-  grid-template-columns:repeat(auto-fit,minmax(112px,1fr));
+  grid-template-columns:repeat(auto-fit,minmax(96px,1fr));
   gap:var(--space-2);
   align-items:stretch;
 }
@@ -276,7 +276,7 @@ a{ color:var(--accent); }
 .tool-btn--destacado:hover{ background:#eaf0fb; color:var(--brand-900); }
 
 /* Manual de usuario en ventana modal ------------------------------------ */
-.manual-dialog{
+.manual-dialog,.admin-dialog{
   width:min(920px,calc(100% - 2rem));
   max-width:920px;
   max-height:calc(100dvh - 2rem);
@@ -287,9 +287,9 @@ a{ color:var(--accent); }
   box-shadow:0 22px 70px rgba(0,0,0,.38);
   overflow:hidden;
 }
-.manual-dialog::backdrop{ background:rgba(5,15,35,.72); backdrop-filter:blur(3px); }
-.manual-dialog[open]{ display:flex; flex-direction:column; }
-body:has(.manual-dialog[open]){ overflow:hidden; }
+.manual-dialog::backdrop,.admin-dialog::backdrop{ background:rgba(5,15,35,.72); backdrop-filter:blur(3px); }
+.manual-dialog[open],.admin-dialog[open]{ display:flex; flex-direction:column; }
+body:has(.manual-dialog[open],.admin-dialog[open]){ overflow:hidden; }
 .manual__head{
   flex:0 0 auto;
   display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-4);
@@ -298,13 +298,13 @@ body:has(.manual-dialog[open]){ overflow:hidden; }
 }
 .manual__title{ margin:0; font-size:1.25rem; }
 .manual__subtitle{ margin:var(--space-1) 0 0; font-size:.84rem; opacity:.84; }
-.manual__close{
+.manual__close,.admin__close{
   min-width:var(--tap); min-height:var(--tap);
   border:1px solid rgba(255,255,255,.45); border-radius:var(--radius);
   color:#fff; background:rgba(255,255,255,.12);
   font:inherit; font-size:1.25rem; cursor:pointer;
 }
-.manual__close:hover{ background:rgba(255,255,255,.24); }
+.manual__close:hover,.admin__close:hover{ background:rgba(255,255,255,.24); }
 .manual__body{ overflow-y:auto; padding:var(--space-5); scroll-behavior:smooth; }
 .manual__intro{
   margin:0 0 var(--space-4); padding:var(--space-4);
@@ -332,8 +332,13 @@ body:has(.manual-dialog[open]){ overflow:hidden; }
   padding:var(--space-3); border:1px solid var(--border);
   border-radius:var(--radius); background:var(--bg-sunken);
 }
+.admin-dialog{ width:min(460px,calc(100% - 2rem)); }
+.admin-dialog .manual__body{ padding:var(--space-5); }
+.admin-dialog .actions{ margin-top:var(--space-4); }
+.admin-dialog__error{ min-height:1.4em; margin:var(--space-2) 0 0; color:var(--err-fg); font-size:.84rem; font-weight:650; }
+.tool-btn[data-admin="unlocked"]{ background:rgba(129,230,165,.2); border-color:rgba(129,230,165,.75); }
 @media (max-width:520px){
-  .manual-dialog{ width:calc(100% - 1rem); max-height:calc(100dvh - 1rem); }
+  .manual-dialog,.admin-dialog{ width:calc(100% - 1rem); max-height:calc(100dvh - 1rem); }
   .manual__head,.manual__body{ padding:var(--space-4); }
 }
 
@@ -858,6 +863,11 @@ details.raw-wrap > summary{
         <span aria-hidden="true">🧹</span>
         <span>Limpiar caché</span>
       </button>
+      <button type="button" class="tool-btn" id="btn-admin"
+              aria-haspopup="dialog" aria-controls="admin-acceso" data-admin="locked">
+        <span aria-hidden="true" id="admin-ico">🔐</span>
+        <span id="admin-label">Acceso admin</span>
+      </button>
     </div>
   </div>
 </header>
@@ -967,7 +977,8 @@ details.raw-wrap > summary{
         <li><strong>Asistente virtual:</strong> abre en una pestaña nueva el asistente de ACC Contadores, para consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica. Úselo cuando el resultado de una consulta requiera interpretación o cuando necesite acompañamiento profesional para el trámite.</li>
         <li><strong>Tema automático:</strong> alterna entre apariencia automática, clara y oscura.</li>
         <li><strong>Limpiar caché:</strong> elimina de la memoria del navegador los resultados temporales de esta sesión.</li>
-        <li><strong>Configuración avanzada:</strong> permite ajustar la duración de la caché y, si corresponde, la dirección de un proxy propio.</li>
+        <li><strong>Acceso admin:</strong> solicita la contraseña administrativa y, al validarla, muestra la configuración avanzada durante la pestaña actual.</li>
+        <li><strong>Configuración avanzada:</strong> visible sólo con la sesión administrativa desbloqueada; permite ajustar la duración de la caché y, si corresponde, la dirección de un proxy propio.</li>
       </ul>
     </section>
 
@@ -997,6 +1008,29 @@ details.raw-wrap > summary{
   </div>
 </dialog>
 
+<dialog class="admin-dialog" id="admin-acceso" aria-labelledby="admin-titulo">
+  <header class="manual__head">
+    <div>
+      <h2 class="manual__title" id="admin-titulo">🔐 Acceso administrativo</h2>
+      <p class="manual__subtitle">Área restringida de configuración</p>
+    </div>
+    <button class="admin__close" id="admin-close" type="button" aria-label="Cerrar acceso administrativo">×</button>
+  </header>
+  <form class="manual__body" id="admin-form">
+    <div class="field">
+      <label for="admin-password">Contraseña de administrador</label>
+      <input class="input" id="admin-password" type="password" required
+             autocomplete="current-password" aria-describedby="admin-help admin-error">
+      <p class="hint" id="admin-help">El acceso se conservará únicamente en esta pestaña. Puede cerrarlo desde el encabezado.</p>
+      <p class="admin-dialog__error" id="admin-error" role="alert" aria-live="polite"></p>
+    </div>
+    <div class="actions">
+      <button class="btn btn--primary" id="admin-submit" type="submit">Desbloquear</button>
+      <button class="btn" id="admin-cancel" type="button">Cancelar</button>
+    </div>
+  </form>
+</dialog>
+
 <main id="contenido">
 
   <!-- Barra de estado: conexión, última consulta y tamaño de caché --------- -->
@@ -1014,7 +1048,7 @@ details.raw-wrap > summary{
   </div>
 
   <!-- Configuración opcional ---------------------------------------------- -->
-  <details class="config-card">
+  <details class="config-card" id="admin-config" hidden>
     <summary><span aria-hidden="true">⚙️</span> Configuración avanzada (opcional)</summary>
     <div class="config-card__body">
       <div class="form-grid">
@@ -1720,6 +1754,15 @@ const RUTAS = {
 
 /** Preferencias persistentes (no contienen datos personales). */
 const PREFS_KEY = "verificadorHaciendaCR.prefs";
+const ADMIN_SESSION_KEY = "verificadorHaciendaCR.adminUnlocked";
+/* PBKDF2-SHA-256, 210 000 iteraciones. Para cambiar la contraseña, genere
+   una sal y un hash nuevos según las instrucciones del README. La contraseña
+   nunca se guarda en texto legible. */
+const ADMIN_AUTH = Object.freeze({
+  salt: "27E2G52uH1U19beu8IUKsA==",
+  hash: "CgLyvTua5FBf4lcQYNlEuAU7xzuqxhQVgpW7bu0Z/M8=",
+  iterations: 210000
+});
 const prefs = {
   theme: "auto",
   proxy: "",
@@ -1742,6 +1785,32 @@ function loadPrefs() {
 function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); }
   catch (e) { console.warn("[prefs] no se pudieron guardar las preferencias:", e); }
+}
+
+function base64Bytes(value) {
+  return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+}
+
+/** Verifica la clave sin almacenar ni comparar nunca su texto original. */
+async function verifyAdminPassword(password) {
+  if (!window.crypto?.subtle || typeof TextEncoder === "undefined") {
+    throw new Error("Este navegador no dispone de la criptografía requerida.");
+  }
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]
+  );
+  const bits = await crypto.subtle.deriveBits({
+    name: "PBKDF2",
+    salt: base64Bytes(ADMIN_AUTH.salt),
+    iterations: ADMIN_AUTH.iterations,
+    hash: "SHA-256"
+  }, key, 256);
+  const actual = new Uint8Array(bits);
+  const expected = base64Bytes(ADMIN_AUTH.hash);
+  if (actual.length !== expected.length) return false;
+  let difference = 0;
+  for (let i = 0; i < actual.length; i++) difference |= actual[i] ^ expected[i];
+  return difference === 0;
 }
 
 /**
@@ -2671,6 +2740,78 @@ function initBotonesComunes() {
 }
 
 /* --- 9.5 Configuración avanzada ------------------------------------------ */
+function initAdminAccess() {
+  const dialog = $("admin-acceso");
+  const form = $("admin-form");
+  const password = $("admin-password");
+  const error = $("admin-error");
+  const submit = $("admin-submit");
+
+  const setUnlocked = (unlocked) => {
+    $("admin-config").hidden = !unlocked;
+    $("btn-admin").dataset.admin = unlocked ? "unlocked" : "locked";
+    $("admin-ico").textContent = unlocked ? "🔓" : "🔐";
+    $("admin-label").textContent = unlocked ? "Cerrar admin" : "Acceso admin";
+    if (!unlocked) $("admin-config").open = false;
+    try {
+      if (unlocked) sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+      else sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    } catch (e) { console.warn("[admin] no se pudo actualizar la sesión:", e); }
+  };
+
+  let restored = false;
+  try { restored = sessionStorage.getItem(ADMIN_SESSION_KEY) === "1"; }
+  catch (e) { console.warn("[admin] no se pudo leer la sesión:", e); }
+  setUnlocked(restored);
+
+  const closeDialog = () => {
+    password.value = "";
+    error.textContent = "";
+    dialog.close();
+  };
+  $("admin-close").addEventListener("click", closeDialog);
+  $("admin-cancel").addEventListener("click", closeDialog);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeDialog();
+  });
+
+  $("btn-admin").addEventListener("click", () => {
+    if ($("btn-admin").dataset.admin === "unlocked") {
+      setUnlocked(false);
+      toast("Sesión administrativa cerrada");
+      return;
+    }
+    dialog.showModal();
+    setTimeout(() => password.focus(), 0);
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    error.textContent = "";
+    submit.disabled = true;
+    submit.textContent = "Verificando…";
+    try {
+      if (!(await verifyAdminPassword(password.value))) {
+        error.textContent = "Contraseña incorrecta.";
+        password.select();
+        return;
+      }
+      setUnlocked(true);
+      closeDialog();
+      $("admin-config").open = true;
+      $("admin-config").scrollIntoView({ behavior: "smooth", block: "center" });
+      toast("Acceso administrativo habilitado");
+    } catch (e) {
+      console.warn("[admin] no se pudo verificar la contraseña:", e);
+      error.textContent = "No fue posible verificar la contraseña en este navegador.";
+    } finally {
+      submit.disabled = false;
+      submit.textContent = "Desbloquear";
+    }
+  });
+}
+
 function initConfig() {
   $("cfg-proxy").value = prefs.proxy;
   $("cfg-ttl").value = String(prefs.ttl);
@@ -3876,6 +4017,7 @@ function init() {
   initTabs();
   initNetworkStatus();
   initBotonesComunes();
+  initAdminAccess();
   initConfig();
 
   initTributaria();
