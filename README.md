@@ -60,10 +60,10 @@ VERIFICADOR/
     ├── pruebas-logica.js      ← 87 pruebas de validadores, normalizadores y registros.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
-    ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
+    ├── pruebas-comportamiento.js ← 28 pruebas del manual modal, acceso admin, paneles y teclado.
     ├── pruebas-navegador.js   ← 58 pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-calidad.js     ← 14 pruebas de memoria, seguridad y contraste.
-    ├── pruebas-recorrido.js   ← 45 pasos por toda la interfaz, sin tolerar errores.
+    ├── pruebas-recorrido.js   ← 46 pasos por toda la interfaz, sin tolerar errores.
     ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
@@ -440,12 +440,12 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Lógica pura (validadores, normalizadores, clasificadores) | 87 | 87 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
-| Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
+| Comportamiento (manual modal, acceso admin, paneles, teclado) | 28 | 28 correctos |
 | Calidad: memoria, seguridad y contraste | 14 | 14 correctos |
-| Recorrido exhaustivo (45 pasos, consola limpia) | 45 | 45 correctos |
+| Recorrido exhaustivo (46 pasos, consola limpia) | 46 | 46 correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **259** | **259 correctos** |
+| **Total** | **272** | **272 correctos** |
 
 ### Pruebas automáticas en cada publicación
 
@@ -489,7 +489,9 @@ node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
 
 **Cambiar la duración predeterminada de la caché.** Modifique `prefs.ttl` (§ 4) o utilice el selector de Configuración avanzada.
 
-**Acceso a la configuración avanzada.** La contraseña inicial es `Admin-ACC-2026!`. Debe cambiarse antes de publicar. El navegador la verifica mediante PBKDF2-SHA-256 (210 000 iteraciones); sólo la sal y el hash están en `ADMIN_AUTH`, y el desbloqueo vive en `sessionStorage` hasta cerrar la pestaña o pulsar «Cerrar admin».
+**Acceso a la configuración avanzada.** La contraseña de reparto es `Admin-ACC-2026!`. El navegador la verifica mediante PBKDF2-SHA-256 (210 000 iteraciones); sólo la sal y el hash están en `ADMIN_AUTH`, la contraseña nunca se guarda en texto legible, y el desbloqueo vive en `sessionStorage` hasta cerrar la pestaña o pulsar «Cerrar admin».
+
+> ⚠️ **Esta contraseña es pública.** Está escrita en este archivo, que se publica junto a la aplicación en un repositorio abierto: cualquiera que lea el README puede abrir el panel. Mientras no se cambie, el control **sólo evita el manejo accidental**, no el acceso deliberado.
 
 Para generar una sal y un hash nuevos, cambie `SU-CONTRASEÑA` y ejecute:
 
@@ -497,7 +499,13 @@ Para generar una sal y un hash nuevos, cambie `SU-CONTRASEÑA` y ejecute:
 node -e "const c=require('crypto');const s=c.randomBytes(16);console.log('salt:',s.toString('base64'));console.log('hash:',c.pbkdf2Sync('SU-CONTRASEÑA',s,210000,32,'sha256').toString('base64'))"
 ```
 
-Copie ambos valores en `ADMIN_AUTH`. Al ser una aplicación estática, este control evita el acceso casual pero no sustituye una autenticación de servidor: una persona que pueda modificar el JavaScript en su navegador puede omitirlo. Para proteger secretos o configuraciones globales se requiere trasladar el área administrativa a un backend autenticado.
+Copie ambos valores en `ADMIN_AUTH` (§ 4 de `index.html`) y **no escriba la contraseña nueva en ningún archivo del repositorio**. Los bancos de pruebas la leen de la variable de entorno `ADMIN_PASSWORD`:
+
+```bash
+ADMIN_PASSWORD='SU-CONTRASEÑA' npm test
+```
+
+Aun con una contraseña privada, al tratarse de una aplicación estática este control evita el acceso casual pero **no sustituye una autenticación de servidor**: quien pueda editar el JavaScript en su propio navegador puede omitirlo. Conviene recordar qué protege realmente: los dos ajustes del panel —duración de la caché y dirección de un proxy propio— se guardan en el `localStorage` de cada visitante y sólo afectan a su propia sesión. No hay allí ningún secreto ni configuración compartida. Para proteger algo que sí lo sea, el área administrativa debe trasladarse a un backend autenticado.
 
 **Personalizar los colores institucionales.** Edite las variables `--brand-900`, `--brand-700` y `--brand-500` (§ 1.1); el resto del diseño se adapta automáticamente en ambos temas.
 

@@ -14,6 +14,15 @@ verificador-hacienda-cr.zip
 # Dependencias de las pruebas
 node_modules/
 
+# Credenciales en texto plano. Este repositorio es público: la contraseña
+# administrativa no debe versionarse nunca. Para cambiarla se generan una sal y
+# un hash nuevos (README, sección de personalización) y se guarda la contraseña
+# fuera del repositorio o en un gestor de contraseñas.
+Contraseña.txt
+contrasena.txt
+*.secret
+.env
+
 # Archivos temporales
 *.tmp
 *.log

@@ -7,6 +7,10 @@ const { chromium } = require("playwright");
 const path = require("node:path");
 const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
 
+/* Contraseña administrativa con la que se publica la aplicación. Si usted la
+   cambia siguiendo el README, exporte ADMIN_PASSWORD antes de ejecutar el banco. */
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin-ACC-2026!";
+
 /**
  * Abre Google Chrome si está instalado y, si no, el Chromium que incluye
  * Playwright. Así el mismo banco sirve en un equipo de trabajo y en
@@ -225,8 +229,28 @@ function registrar(tipo, texto, contexto) {
   await paso("Tema: ciclo completo de los tres modos", async () => {
     for (let i = 0; i < 4; i++) { await p.click("#btn-theme"); await esperar(120); }
   });
+  await paso("Acceso administrativo: rechazo, desbloqueo y cierre", async () => {
+    if (await p.locator("#admin-config").isVisible()) throw new Error("la configuración se ve sin desbloquear");
+    await p.click("#btn-admin");
+    await esperar(250);
+    await p.fill("#admin-password", "clave-incorrecta");
+    await p.click("#admin-submit");
+    await esperar(500);
+    if (!(await p.locator("#admin-error").textContent()).trim()) throw new Error("una contraseña incorrecta no produjo aviso");
+    if (await p.locator("#admin-config").isVisible()) throw new Error("una contraseña incorrecta desbloqueó la configuración");
+    await p.fill("#admin-password", ADMIN_PASSWORD);
+    await p.click("#admin-submit");
+    await esperar(800);
+    if (!(await p.locator("#admin-config").isVisible())) {
+      throw new Error("la contraseña correcta no desbloqueó la configuración (exporte ADMIN_PASSWORD si la cambió)");
+    }
+  });
   await paso("Configuración avanzada: guardar, proxy inválido y restablecer", async () => {
-    await p.locator("details.config-card summary").click();
+    // El desbloqueo ya despliega el panel: se pulsa el resumen sólo si sigue
+    // plegado, porque hacerlo sobre uno abierto lo cerraría.
+    if (!(await p.locator("#admin-config").evaluate((n) => n.open))) {
+      await p.locator("details.config-card summary").click();
+    }
     await esperar(150);
     await p.selectOption("#cfg-ttl", "300000");
     await p.click("#cfg-save");

@@ -1,10 +1,15 @@
 /**
- * Auditoría de comportamiento: manual modal, paneles informativos,
- * teclado y adaptación a pantallas pequeñas con el manual abierto.
+ * Auditoría de comportamiento: manual modal, acceso administrativo, paneles
+ * informativos, teclado y adaptación a pantallas pequeñas con el manual abierto.
  */
 const { chromium } = require("playwright");
 const path = require("node:path");
 const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
+
+/* Contraseña administrativa con la que se publica la aplicación. Si usted la
+   cambia siguiendo el README, exporte ADMIN_PASSWORD antes de ejecutar el
+   banco; en caso contrario estas pruebas avisarán de que no coincide. */
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin-ACC-2026!";
 
 /**
  * Abre Google Chrome si está instalado y, si no, el Chromium que incluye
@@ -87,6 +92,101 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   await btnCerrar.click();
   await esperar(300);
   check("El botón de cierre funciona", !(await dlg.evaluate((n) => n.open)), "open=false");
+
+  /* ---------- Acceso administrativo a la configuración avanzada ---------- */
+  const visible = (sel) => p.evaluate((s) => {
+    const n = document.querySelector(s);
+    return Boolean(n && n.offsetParent !== null);
+  }, sel);
+
+  check("La configuración avanzada no se ve sin desbloquear",
+    !(await visible("#admin-config")),
+    "#admin-config oculto al cargar la página");
+  check("El botón de acceso arranca en estado bloqueado",
+    (await p.locator("#btn-admin").getAttribute("data-admin")) === "locked",
+    `data-admin="${await p.locator("#btn-admin").getAttribute("data-admin")}" · rótulo «${(await p.locator("#admin-label").textContent()).trim()}»`);
+
+  await p.click("#btn-admin");
+  await esperar(350);
+  const admDlg = p.locator("dialog.admin-dialog");
+  const admEstado = await admDlg.evaluate((n) => ({
+    modal: n.matches(":modal"),
+    etiqueta: n.getAttribute("aria-label") || n.getAttribute("aria-labelledby"),
+    tipo: n.querySelector("#admin-password")?.type
+  }));
+  check("El acceso se pide en un diálogo modal con nombre accesible",
+    admEstado.modal && Boolean(admEstado.etiqueta),
+    `:modal=${admEstado.modal}, referencia="${admEstado.etiqueta}"`);
+  check("La contraseña se escribe enmascarada", admEstado.tipo === "password",
+    `<input type="${admEstado.tipo}">`);
+
+  // Escape debe cerrar el diálogo sin conceder acceso.
+  await p.keyboard.press("Escape");
+  await esperar(300);
+  check("Escape cierra el acceso sin desbloquear nada",
+    !(await admDlg.evaluate((n) => n.open)) && !(await visible("#admin-config")),
+    "diálogo cerrado y configuración aún oculta");
+
+  // Una contraseña equivocada no debe conceder acceso.
+  await p.click("#btn-admin");
+  await esperar(300);
+  await p.fill("#admin-password", "clave-que-no-es");
+  await p.click("#admin-submit");
+  await esperar(600);
+  const errorTexto = (await p.locator("#admin-error").textContent()).trim();
+  check("Una contraseña incorrecta se rechaza y no revela la configuración",
+    errorTexto.length > 0 && !(await visible("#admin-config")) &&
+    (await p.locator("#btn-admin").getAttribute("data-admin")) === "locked",
+    `aviso «${errorTexto}» · configuración aún oculta`);
+
+  // La contraseña correcta sí debe conceder acceso.
+  await p.fill("#admin-password", ADMIN_PASSWORD);
+  await p.click("#admin-submit");
+  await esperar(900);
+  const desbloqueado = await visible("#admin-config");
+  check("La contraseña correcta muestra la configuración avanzada",
+    desbloqueado && (await p.locator("#btn-admin").getAttribute("data-admin")) === "unlocked",
+    desbloqueado
+      ? `rótulo «${(await p.locator("#admin-label").textContent()).trim()}» · #admin-config visible`
+      : "no se desbloqueó: ¿la contraseña se cambió? exporte ADMIN_PASSWORD");
+
+  // Desbloqueado, el botón ya no abre un diálogo: cierra la sesión. Prometer
+  // lo contrario a un lector de pantalla sería un anuncio falso.
+  const ariaTrasDesbloquear = await p.locator("#btn-admin").evaluate((n) => ({
+    haspopup: n.getAttribute("aria-haspopup"),
+    controls: n.getAttribute("aria-controls")
+  }));
+  check("El botón deja de anunciar un diálogo cuando ya no lo abre",
+    ariaTrasDesbloquear.haspopup === null && ariaTrasDesbloquear.controls === null,
+    `aria-haspopup=${ariaTrasDesbloquear.haspopup ?? "(ausente)"}, aria-controls=${ariaTrasDesbloquear.controls ?? "(ausente)"}`);
+
+  const rastro = await p.evaluate((clave) => {
+    const todo = Object.entries(localStorage).map(([k, v]) => k + "=" + v).join(" | ") +
+      " | " + Object.entries(sessionStorage).map(([k, v]) => k + "=" + v).join(" | ") +
+      " | " + document.cookie;
+    return { filtra: todo.includes(clave), sesion: Object.keys(sessionStorage).join(", ") };
+  }, ADMIN_PASSWORD);
+  check("La contraseña nunca se guarda en el navegador", !rastro.filtra,
+    `sessionStorage sólo conserva la marca de sesión: ${rastro.sesion || "(vacío)"}`);
+
+  // El desbloqueo debe sobrevivir a una recarga de la misma pestaña.
+  await p.reload({ waitUntil: "load" });
+  await esperar(500);
+  check("El desbloqueo se conserva al recargar la pestaña", await visible("#admin-config"),
+    "sessionStorage mantiene la sesión administrativa");
+
+  await p.click("#btn-admin");
+  await esperar(400);
+  const trasCerrar = await p.evaluate(() => ({
+    visible: Boolean(document.querySelector("#admin-config")?.offsetParent),
+    claves: Object.keys(sessionStorage).length,
+    haspopup: document.querySelector("#btn-admin").getAttribute("aria-haspopup")
+  }));
+  check("«Cerrar admin» vuelve a ocultar la configuración y borra la sesión",
+    !trasCerrar.visible && trasCerrar.claves === 0,
+    `configuración oculta · sessionStorage = ${trasCerrar.claves} claves`);
+  check("Al bloquear de nuevo, el botón vuelve a anunciar el diálogo",
+    trasCerrar.haspopup === "dialog", `aria-haspopup="${trasCerrar.haspopup}"`);
 
   /* ---------- Paneles informativos por módulo ---------- */
   const guias = await p.evaluate(() => {

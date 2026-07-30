@@ -2748,10 +2748,22 @@ function initAdminAccess() {
   const submit = $("admin-submit");
 
   const setUnlocked = (unlocked) => {
+    const boton = $("btn-admin");
     $("admin-config").hidden = !unlocked;
-    $("btn-admin").dataset.admin = unlocked ? "unlocked" : "locked";
+    boton.dataset.admin = unlocked ? "unlocked" : "locked";
     $("admin-ico").textContent = unlocked ? "🔓" : "🔐";
     $("admin-label").textContent = unlocked ? "Cerrar admin" : "Acceso admin";
+    // El mismo botón cumple dos funciones: bloqueado abre el diálogo de acceso
+    // y desbloqueado cierra la sesión. Anunciar un diálogo que ya no se abrirá
+    // desorienta a quien navega con lector de pantalla, así que las propiedades
+    // que lo prometen sólo se declaran mientras siguen siendo ciertas.
+    if (unlocked) {
+      boton.removeAttribute("aria-haspopup");
+      boton.removeAttribute("aria-controls");
+    } else {
+      boton.setAttribute("aria-haspopup", "dialog");
+      boton.setAttribute("aria-controls", "admin-acceso");
+    }
     if (!unlocked) $("admin-config").open = false;
     try {
       if (unlocked) sessionStorage.setItem(ADMIN_SESSION_KEY, "1");

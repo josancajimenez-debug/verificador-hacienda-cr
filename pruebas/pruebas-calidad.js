@@ -121,14 +121,21 @@ function contraste(c1, c2) {
   await p.fill("#in-tributaria", "4000042139");
   await p.click("#btn-tributaria");
   await p.waitForSelector("#out-tributaria .dl__item", { timeout: 45000 });
+  // Se desbloquea el área administrativa para comprobar el peor caso: incluso
+  // con la sesión abierta, lo único que se guarda es una marca sin dato alguno.
+  await p.evaluate(() => { try { sessionStorage.setItem(ADMIN_SESSION_KEY, "1"); } catch { /* sin almacenamiento */ } });
   const almacenado = await p.evaluate(() => ({
     local: Object.entries(localStorage).map(([k, v]) => k + "=" + v).join(" | "),
-    session: Object.keys(sessionStorage).length,
+    session: Object.entries(sessionStorage).map(([k, v]) => k + "=" + v).join(" | "),
+    claves: Object.keys(sessionStorage),
     cookies: document.cookie
   }));
+  const CLAVES_SESION_PERMITIDAS = ["verificadorHaciendaCR.adminUnlocked"];
+  const intrusas = almacenado.claves.filter((k) => !CLAVES_SESION_PERMITIDAS.includes(k));
   check("Ninguna identificación llega al almacenamiento persistente",
-    !/4000042139/.test(almacenado.local + almacenado.cookies) && almacenado.session === 0,
-    `localStorage: ${almacenado.local.slice(0, 70)} · sessionStorage: ${almacenado.session} claves · cookies: ${almacenado.cookies || "ninguna"}`);
+    !/4000042139/.test(almacenado.local + almacenado.session + almacenado.cookies) && intrusas.length === 0,
+    `localStorage: ${almacenado.local.slice(0, 70)} · sessionStorage: ${almacenado.session || "(vacío)"} · cookies: ${almacenado.cookies || "ninguna"}`);
+  await p.evaluate(() => { try { sessionStorage.clear(); } catch { /* sin almacenamiento */ } });
 
   /* ---------- Seguridad: el proxy sólo admite HTTPS ---------- */
   const proxy = await p.evaluate(() => {
