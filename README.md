@@ -447,6 +447,19 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
 | **Total** | **232** | **232 correctos** |
 
+### Pruebas automáticas en cada publicación
+
+El repositorio incluye un flujo de integración continua (`.github/workflows/pruebas.yml`) que se ejecuta en cada `git push` a `main` y en cada propuesta de cambio. Comprueba la sintaxis del script, que no aparezca ninguna API de inserción de HTML, que no se haya colado ningún recurso externo, y ejecuta los bancos de **lógica**, **estructura** y **comportamiento**.
+
+**Los bancos que consultan la API no se ejecutan ahí, y es deliberado.** El motivo no es el tiempo, sino la política de uso del Ministerio: bloquea por dirección IP y advierte expresamente del riesgo de las «arquitecturas en la nube, donde cientos de clientes acceden desde un mismo servidor, concentrando el tráfico en una sola IP». Los runners de GitHub comparten sus direcciones entre miles de proyectos; lanzar consultas desde ahí sería exactamente ese anti-patrón, y un bloqueo perjudicaría a terceros ajenos a este proyecto.
+
+Por eso la regla es: **antes de publicar, ejecute la suite completa en su equipo**, que sale con su propia dirección IP.
+
+```bash
+npm test            # los siete bancos locales
+npm run test:sitio  # contra la URL pública, después de publicar
+```
+
 Cómo ejecutarlas (Node.js 18 o superior):
 
 ```bash

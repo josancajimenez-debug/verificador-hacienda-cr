@@ -7,6 +7,17 @@ const { chromium } = require("playwright");
 const path = require("node:path");
 const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
 
+/**
+ * Abre Google Chrome si está instalado y, si no, el Chromium que incluye
+ * Playwright. Así el mismo banco sirve en un equipo de trabajo y en
+ * integración continua, donde Chrome no está disponible.
+ */
+async function abrirNavegador(opciones = {}) {
+  try { return await chromium.launch({ channel: "chrome", ...opciones }); }
+  catch { return await chromium.launch(opciones); }
+}
+
+
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 const incidencias = [];
 let pasos = 0;
@@ -31,7 +42,7 @@ function registrar(tipo, texto, contexto) {
 }
 
 (async () => {
-  const b = await chromium.launch({ channel: "chrome" });
+  const b = await abrirNavegador();
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 }, locale: "es-CR" });
   const p = await ctx.newPage();
   let contexto = "carga inicial";

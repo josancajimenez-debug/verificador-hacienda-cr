@@ -1,0 +1,104 @@
+# =============================================================================
+# Pruebas automáticas del Verificador Hacienda CR
+# =============================================================================
+#
+# Se ejecutan en cada publicación de cambios y en cada propuesta de cambio.
+#
+# QUÉ SE EJECUTA AQUÍ Y QUÉ NO, Y POR QUÉ
+# ---------------------------------------
+# Sólo corren los tres bancos que NO consultan api.hacienda.go.cr:
+#
+#   · pruebas-logica.js         validadores y normalizadores (sin red)
+#   · pruebas-estructura.js     DOM, ARIA, anidamiento de paneles (sin red)
+#   · pruebas-comportamiento.js manual modal, paneles y teclado (sin red)
+#
+# Los bancos que sí consultan la API (api, calidad, recorrido, navegador y
+# sitio) se ejecutan a propósito SÓLO en el equipo de la persona que desarrolla.
+#
+# El motivo no es el tiempo, sino la política de uso del Ministerio de
+# Hacienda: bloquea por dirección IP y advierte expresamente del riesgo de las
+# «arquitecturas en la nube, donde cientos de clientes acceden desde un mismo
+# servidor, concentrando el tráfico en una sola IP». Los runners de GitHub
+# comparten sus direcciones entre miles de proyectos: lanzar consultas desde
+# ahí es justamente ese anti-patrón, y un bloqueo afectaría a terceros ajenos
+# a este proyecto.
+#
+# Antes de publicar, ejecute en su equipo la suite completa:
+#     npm test
+#     npm run test:sitio
+# =============================================================================
+
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Si se publican cambios seguidos, se cancela la ejecución anterior
+concurrency:
+  group: pruebas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sin-red:
+    name: Lógica, estructura y comportamiento
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Comprobar la sintaxis de index.html
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('index.html', 'utf8');
+            const script = html.match(/<script>([\s\S]*?)<\/script>/);
+            if (!script) { console.error('No se encontró el bloque <script>'); process.exit(1); }
+            fs.writeFileSync('/tmp/app.js', script[1]);
+            console.log('Script extraído:', (script[1].length / 1024).toFixed(0), 'KB');
+          "
+          node --check /tmp/app.js
+          echo "Sintaxis correcta"
+
+      - name: Comprobar que no se inserta HTML sin depurar
+        run: |
+          # innerHTML, eval y compañía sólo pueden aparecer en comentarios
+          if grep -nE '(innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval)\s*[=(]' index.html; then
+            echo "Se encontró una API de inserción de HTML en el código"
+            exit 1
+          fi
+          echo "Sin APIs de inserción de HTML"
+
+      - name: Comprobar que no se cargan recursos externos
+        run: |
+          # La aplicación debe seguir siendo un archivo autónomo
+          if grep -oE '(src|href)="https?://[^"]*"' index.html | grep -vE '(api\.hacienda\.go\.cr/docs|ovitribucr\.hacienda\.go\.cr|josancajimenez-debug\.github\.io)'; then
+            echo "Hay un recurso externo que no es un enlace de navegación"
+            exit 1
+          fi
+          echo "Sin dependencias externas"
+
+      - name: Banco 1 · Lógica pura
+        run: npm run test:logica
+
+      - name: Banco 3 · Estructura y accesibilidad del DOM
+        run: npm run test:estructura
+
+      - name: Banco 4 · Comportamiento (manual, paneles, teclado)
+        run: npm run test:comportamiento

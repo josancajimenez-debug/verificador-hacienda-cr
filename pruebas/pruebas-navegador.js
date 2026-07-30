@@ -11,6 +11,17 @@ const fs = require("node:fs");
 
 // Se admite ruta relativa o absoluta: se resuelve siempre a una URL file://
 const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
+
+/**
+ * Abre Google Chrome si está instalado y, si no, el Chromium que incluye
+ * Playwright. Así el mismo banco sirve en un equipo de trabajo y en
+ * integración continua, donde Chrome no está disponible.
+ */
+async function abrirNavegador(opciones = {}) {
+  try { return await chromium.launch({ channel: "chrome", ...opciones }); }
+  catch { return await chromium.launch(opciones); }
+}
+
 const SHOTS = path.resolve(process.argv[3] || ".");
 
 let ok = 0, ko = 0;
@@ -22,7 +33,7 @@ function check(nombre, cond, nota) {
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  const browser = await chromium.launch({ channel: "chrome" });
+  const browser = await abrirNavegador();
 
   /* ============ ESCRITORIO ============ */
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: "es-CR" });
