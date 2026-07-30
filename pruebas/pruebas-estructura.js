@@ -82,10 +82,37 @@ const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).hre
 
     // --- 9. Paneles y pestañas coherentes ---
     const tabs = [...document.querySelectorAll('[role="tab"]')];
+    const paneles = [...document.querySelectorAll('[role="tabpanel"]')];
     out.tabs = tabs.length;
-    out.tabpanels = document.querySelectorAll('[role="tabpanel"]').length;
+    out.tabpanels = paneles.length;
     out.tabsSinPanel = tabs.filter((t) => !document.getElementById(t.getAttribute("aria-controls") || "")).length;
     out.tabsSeleccionadas = tabs.filter((t) => t.getAttribute("aria-selected") === "true").length;
+
+    // Ningún panel debe estar dentro de otro. Si uno queda anidado en un panel
+    // oculto, su contenido resulta inalcanzable aunque su pestaña se active, y
+    // ni el conteo de paneles ni las referencias ARIA lo delatan.
+    out.panelesAnidados = paneles
+      .filter((p) => p.parentElement.closest('[role="tabpanel"]'))
+      .map((p) => `#${p.id} dentro de #${p.parentElement.closest('[role="tabpanel"]').id}`);
+
+    // Cada panel debe colgar directamente del contenedor principal.
+    out.panelesFueraDeMain = paneles
+      .filter((p) => p.parentElement !== document.querySelector("main"))
+      .map((p) => `#${p.id} en <${p.parentElement.tagName.toLowerCase()}>`);
+
+    // Al activar cada pestaña, su primer control debe quedar realmente visible.
+    out.panelesConControlOculto = [];
+    for (const t of tabs) {
+      const panel = document.getElementById(t.getAttribute("aria-controls"));
+      if (!panel) continue;
+      const previo = paneles.map((p) => p.hidden);
+      paneles.forEach((p) => { p.hidden = p !== panel; });
+      const control = panel.querySelector("input:not([type=hidden]), select, button");
+      if (control && control.offsetParent === null) {
+        out.panelesConControlOculto.push(`#${panel.id} → ${control.tagName.toLowerCase()}#${control.id || "(sin id)"}`);
+      }
+      paneles.forEach((p, k) => { p.hidden = previo[k]; });
+    }
 
     // --- 10. Elementos con id referenciados por el script pero ausentes ---
     const src = [...document.querySelectorAll("script")].map((s) => s.textContent).join("\n");
@@ -119,7 +146,10 @@ const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).hre
     ["target=_blank sin rel=noopener", r.targetSinRel],
     ["Saltos en el orden de encabezados", r.saltosEncabezado],
     ["Ids usados por el script pero ausentes", r.idsUsadosPeroAusentes],
-    ["Imágenes con aspecto declarado erróneo", r.imgAspectoIncorrecto]
+    ["Imágenes con aspecto declarado erróneo", r.imgAspectoIncorrecto],
+    ["Paneles anidados dentro de otro panel", r.panelesAnidados],
+    ["Paneles que no cuelgan de <main>", r.panelesFueraDeMain],
+    ["Paneles cuyo primer control no se ve al activarlos", r.panelesConControlOculto]
   ];
   let problemas = 0;
   for (const [n, v] of lineas) {

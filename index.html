@@ -827,6 +827,13 @@ details.raw-wrap > summary{
       </div>
     </div>
     <div class="header-tools">
+      <a class="tool-btn tool-btn--destacado" id="btn-asistente"
+         href="https://josancajimenez-debug.github.io/acc-asistente/"
+         target="_blank" rel="noopener noreferrer"
+         aria-label="Abrir el Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica (abre en una pestaña nueva)">
+        <span aria-hidden="true">💬</span>
+        <span>Asistente virtual</span>
+      </a>
       <button type="button" class="tool-btn" id="btn-manual"
               aria-haspopup="dialog" aria-controls="manual-usuario">
         <span aria-hidden="true">📘</span>
@@ -838,13 +845,6 @@ details.raw-wrap > summary{
          aria-label="Verificar comprobante electrónico en el sitio oficial del Ministerio de Hacienda (abre en una pestaña nueva)">
         <span aria-hidden="true">✅</span>
         <span>Verificar comprobante</span>
-      </a>
-      <a class="tool-btn tool-btn--destacado" id="btn-asistente"
-         href="https://josancajimenez-debug.github.io/acc-asistente/"
-         target="_blank" rel="noopener noreferrer"
-         aria-label="Abrir el Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica (abre en una pestaña nueva)">
-        <span aria-hidden="true">💬</span>
-        <span>Asistente virtual</span>
       </a>
       <button type="button" class="tool-btn" id="btn-theme" aria-live="polite">
         <span aria-hidden="true" id="theme-ico">🌓</span>
@@ -863,9 +863,6 @@ details.raw-wrap > summary{
     <button class="tab" role="tab" id="tab-tributaria" aria-controls="panel-tributaria" aria-selected="true" tabindex="0" data-panel="tributaria">
       <span class="tab__ico" aria-hidden="true">🏛️</span> Situación tributaria
     </button>
-    <button class="tab" role="tab" id="tab-cambio" aria-controls="panel-cambio" aria-selected="false" tabindex="-1" data-panel="cambio">
-      <span class="tab__ico" aria-hidden="true">💱</span> Tipo de cambio
-    </button>
     <button class="tab" role="tab" id="tab-exoneracion" aria-controls="panel-exoneracion" aria-selected="false" tabindex="-1" data-panel="exoneracion">
       <span class="tab__ico" aria-hidden="true">📄</span> Exoneraciones
     </button>
@@ -877,6 +874,9 @@ details.raw-wrap > summary{
     </button>
     <button class="tab" role="tab" id="tab-cabys" aria-controls="panel-cabys" aria-selected="false" tabindex="-1" data-panel="cabys">
       <span class="tab__ico" aria-hidden="true">📦</span> CABYS
+    </button>
+    <button class="tab" role="tab" id="tab-cambio" aria-controls="panel-cambio" aria-selected="false" tabindex="-1" data-panel="cambio">
+      <span class="tab__ico" aria-hidden="true">💱</span> Tipo de cambio
     </button>
   </div>
 </nav>
@@ -1113,53 +1113,6 @@ details.raw-wrap > summary{
   </section>
 
   <!-- ==== MÓDULO 2: TIPO DE CAMBIO ======================================= -->
-  <section class="panel" id="panel-cambio" role="tabpanel" aria-labelledby="tab-cambio" tabindex="0" hidden>
-
-    <div class="card">
-      <div class="card__head">
-        <h2 class="card__title"><span aria-hidden="true">💵</span> Tipo de cambio del dólar — vigente</h2>
-        <p class="card__desc">Tipo de cambio de compra y de venta publicado para el día en curso.</p>
-        <code class="card__endpoint">GET https://api.hacienda.go.cr/indicadores/tc/dolar</code>
-      </div>
-      <div class="card__body">
-        <details class="guide">
-          <summary>Significado, uso, aplicación e importancia</summary>
-          <div class="guide__grid">
-            <section class="guide__item">
-              <h3>Significado</h3>
-              <p>Expresa cuántos colones corresponden a una unidad de dólar. La compra orienta operaciones en las que una entidad compra dólares; la venta, aquellas en las que los vende.</p>
-            </section>
-            <section class="guide__item">
-              <h3>Uso</h3>
-              <p>Sirve para convertir operaciones en moneda extranjera a colones y registrar correctamente facturas, ingresos, gastos, activos y pasivos.</p>
-            </section>
-            <section class="guide__item">
-              <h3>Aplicación práctica</h3>
-              <p>Para el IVA, una operación pactada en moneda distinta al colón utiliza el tipo de cambio de venta de referencia vigente cuando ocurre el hecho generador. En comprobantes electrónicos en USD también se informa esa referencia.</p>
-            </section>
-            <section class="guide__item">
-              <h3>Importancia</h3>
-              <p>Elegir la fecha y el tipo correctos evita diferencias en la base imponible, el impuesto y la contabilidad. Las diferencias cambiarias también pueden incidir en la renta gravable.</p>
-            </section>
-          </div>
-          <p class="guide__source"><strong>Citas:</strong> (Asamblea Legislativa de la República de Costa Rica, 1982, art. 15; Asamblea Legislativa de la República de Costa Rica, 1988; Dirección General de Tributación, 2024a, p. 50). <cite>Ley 6826</cite> · <cite>Ley 7092</cite> · <cite>Estructuras 4.4</cite>.</p>
-        </details>
-        <div class="actions" style="margin-top:0;padding-top:0;border-top:0">
-          <button type="button" class="btn btn--primary" id="btn-tc-actual">
-            <span aria-hidden="true">🔄</span> Consultar tipo de cambio actual
-          </button>
-          <button type="button" class="btn" data-clear="tcactual">Limpiar</button>
-        </div>
-        <div class="loader" id="load-tcactual" role="status">
-          <span class="spinner" aria-hidden="true"></span>
-          <span>Consultando el tipo de cambio…</span>
-        </div>
-        <div id="alert-tcactual" role="status" aria-live="polite"></div>
-        <div class="result" id="out-tcactual" aria-live="polite"></div>
-      </div>
-    </div>
-
-  </section>
 
   <!-- ==== MÓDULO 3: EXONERACIONES ======================================== -->
   <section class="panel" id="panel-exoneracion" role="tabpanel" aria-labelledby="tab-exoneracion" tabindex="0" hidden>
@@ -1463,6 +1416,54 @@ details.raw-wrap > summary{
         <div class="result" id="out-cabys" aria-live="polite"></div>
       </div>
     </div>
+  </section>
+
+  <section class="panel" id="panel-cambio" role="tabpanel" aria-labelledby="tab-cambio" tabindex="0" hidden>
+
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">💵</span> Tipo de cambio del dólar — vigente</h2>
+        <p class="card__desc">Tipo de cambio de compra y de venta publicado para el día en curso.</p>
+        <code class="card__endpoint">GET https://api.hacienda.go.cr/indicadores/tc/dolar</code>
+      </div>
+      <div class="card__body">
+        <details class="guide">
+          <summary>Significado, uso, aplicación e importancia</summary>
+          <div class="guide__grid">
+            <section class="guide__item">
+              <h3>Significado</h3>
+              <p>Expresa cuántos colones corresponden a una unidad de dólar. La compra orienta operaciones en las que una entidad compra dólares; la venta, aquellas en las que los vende.</p>
+            </section>
+            <section class="guide__item">
+              <h3>Uso</h3>
+              <p>Sirve para convertir operaciones en moneda extranjera a colones y registrar correctamente facturas, ingresos, gastos, activos y pasivos.</p>
+            </section>
+            <section class="guide__item">
+              <h3>Aplicación práctica</h3>
+              <p>Para el IVA, una operación pactada en moneda distinta al colón utiliza el tipo de cambio de venta de referencia vigente cuando ocurre el hecho generador. En comprobantes electrónicos en USD también se informa esa referencia.</p>
+            </section>
+            <section class="guide__item">
+              <h3>Importancia</h3>
+              <p>Elegir la fecha y el tipo correctos evita diferencias en la base imponible, el impuesto y la contabilidad. Las diferencias cambiarias también pueden incidir en la renta gravable.</p>
+            </section>
+          </div>
+          <p class="guide__source"><strong>Citas:</strong> (Asamblea Legislativa de la República de Costa Rica, 1982, art. 15; Asamblea Legislativa de la República de Costa Rica, 1988; Dirección General de Tributación, 2024a, p. 50). <cite>Ley 6826</cite> · <cite>Ley 7092</cite> · <cite>Estructuras 4.4</cite>.</p>
+        </details>
+        <div class="actions" style="margin-top:0;padding-top:0;border-top:0">
+          <button type="button" class="btn btn--primary" id="btn-tc-actual">
+            <span aria-hidden="true">🔄</span> Consultar tipo de cambio actual
+          </button>
+          <button type="button" class="btn" data-clear="tcactual">Limpiar</button>
+        </div>
+        <div class="loader" id="load-tcactual" role="status">
+          <span class="spinner" aria-hidden="true"></span>
+          <span>Consultando el tipo de cambio…</span>
+        </div>
+        <div id="alert-tcactual" role="status" aria-live="polite"></div>
+        <div class="result" id="out-tcactual" aria-live="polite"></div>
+      </div>
+    </div>
+
   </section>
 
   <details class="references card">

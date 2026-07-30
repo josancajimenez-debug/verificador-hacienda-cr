@@ -300,21 +300,41 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     `${archivo.suggestedFilename()} · ${csv.split("\r\n").length - 1} filas de datos`);
 
   /* ---- Accesibilidad: navegación por teclado en las pestañas ---- */
-  await page.locator("#tab-tributaria").focus();
+  // Las comprobaciones no dependen de un orden concreto de pestañas: se leen
+  // del DOM, de modo que reordenar los módulos no invalida las pruebas.
+  const orden = await page.evaluate(() => [...document.querySelectorAll('[role="tab"]')].map((t) => t.id));
+  const [primera, segunda] = orden;
+  const ultima = orden[orden.length - 1];
+
+  await page.locator("#" + primera).focus();
   await page.keyboard.press("ArrowRight");
   await esperar(150);
   const focoTras = await page.evaluate(() => document.activeElement.id);
   check("A11y · las flechas del teclado desplazan el foco entre pestañas",
-    focoTras === "tab-cambio", `foco en #${focoTras}`);
+    focoTras === segunda, `de #${primera} a #${focoTras} (siguiente en el orden del DOM)`);
   check("A11y · la pestaña activa se marca con aria-selected",
-    (await page.getAttribute("#tab-cambio", "aria-selected")) === "true", 'aria-selected="true"');
-  check("A11y · el panel correspondiente queda visible y el resto oculto",
-    (await page.locator("#panel-cambio").isVisible()) && !(await page.locator("#panel-tributaria").isVisible()),
-    "panel-cambio visible, panel-tributaria oculto");
+    (await page.getAttribute("#" + segunda, "aria-selected")) === "true",
+    `#${segunda} con aria-selected="true"`);
 
-  const tabIndexInactivo = await page.getAttribute("#tab-tributaria", "tabindex");
+  const panelSegunda = "panel-" + segunda.replace("tab-", "");
+  const panelPrimera = "panel-" + primera.replace("tab-", "");
+  check("A11y · el panel correspondiente queda visible y el resto oculto",
+    (await page.locator("#" + panelSegunda).isVisible()) && !(await page.locator("#" + panelPrimera).isVisible()),
+    `#${panelSegunda} visible, #${panelPrimera} oculto`);
+
+  await page.keyboard.press("End");
+  await esperar(150);
+  check("A11y · la tecla Fin salta a la última pestaña",
+    (await page.evaluate(() => document.activeElement.id)) === ultima, `foco en #${ultima}`);
+  await page.keyboard.press("Home");
+  await esperar(150);
+  check("A11y · la tecla Inicio vuelve a la primera pestaña",
+    (await page.evaluate(() => document.activeElement.id)) === primera, `foco en #${primera}`);
+
+  const inactivas = await page.evaluate(() =>
+    [...document.querySelectorAll('[role="tab"]')].filter((t) => t.tabIndex === 0).length);
   check("A11y · sólo una pestaña participa en el orden de tabulación",
-    tabIndexInactivo === "-1", `tabindex de la pestaña inactiva = ${tabIndexInactivo}`);
+    inactivas === 1, `${inactivas} pestaña con tabindex="0"; el resto, -1`);
 
   check("A11y · existe enlace para saltar al contenido",
     (await page.locator(".skip-link").count()) === 1,
