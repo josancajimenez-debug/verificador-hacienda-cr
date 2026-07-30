@@ -3338,9 +3338,14 @@ const ETIQUETAS_REGISTRO = {
   nombrePermisonarioIncopesca: "Nombre del permisionario",
   fechaVenceIncopesca: "Vence el",
   indicadorActivoIncopesca: "Activo",
+  nombreMAG: "Nombre de la persona productora",
+  estadoMAG: "Estado",
+  fechaAltaMAG: "Inscrito el",
+  fechaBajaMAG: "Vence el",
+  indicadorActivoMAG: "Activo",
+  fuenteMAG: "Registro de origen",
   nombreProductorMAG: "Nombre de la persona productora",
   fechaVenceMAG: "Vence el",
-  indicadorActivoMAG: "Activo",
   nombreAcuicultor: "Nombre del acuicultor",
   fechaVenceAcuicultor: "Vence el",
   indicadorActivoAcuicultor: "Activo",
@@ -3453,21 +3458,46 @@ function contarRegistros(datos) {
  * @returns {{estado:"vigente"|"no-vigente"|"desconocida", motivo:string}}
  */
 function evaluarVigencia(fila) {
-  let activo = null;
-  let vence = null;
+  let activo = null;      // indicador booleano de la institución
+  let vence = null;       // fecha en que deja de tener efecto
+  let estadoTexto = null; // descripción textual del estado, si viene
 
   for (const [clave, valor] of Object.entries(fila)) {
-    if (typeof valor === "boolean" && /activ/i.test(clave)) activo = valor;
-    if (typeof valor === "string" && /vence|vencimiento|expira/i.test(clave)) vence = isoDatePart(valor);
+    if (typeof valor === "boolean" && /activ|vigen/i.test(clave)) activo = valor;
+
+    // La fecha de término se nombra de maneras distintas según el registro:
+    // «fechaVenceIncopesca» en los permisos de pesca y «fechaBajaMAG» en el
+    // registro agropecuario. Se excluye «alta», que es la fecha de inicio y
+    // tomarla por vencimiento invertiría por completo el resultado.
+    if (typeof valor === "string" && /vence|vencimiento|expira|baja|caduc/i.test(clave) && !/alta|inicio|desde/i.test(clave)) {
+      vence = isoDatePart(valor) || vence;
+    }
+
+    if (typeof valor === "string" && /estado|condicion|situacion/i.test(clave)) estadoTexto = valor.trim();
   }
 
-  if (activo === null && vence === null) return { estado: "desconocida", motivo: "" };
+  // Un estado textual desfavorable manda sobre el indicador booleano: ante
+  // señales contradictorias no se afirma la vigencia.
+  const textoDesfavorable = estadoTexto !== null &&
+    /inactiv|vencid|caduc|suspend|anulad|cancelad|de\s*baja|no\s*vigente/i.test(estadoTexto);
+
+  if (activo === null && vence === null && estadoTexto === null) return { estado: "desconocida", motivo: "" };
 
   const vencida = vence !== null && vence < hoyISO();
+  const detalleFecha = vence !== null ? ` (vence el ${fmtFecha(vence)})` : "";
+
+  if (textoDesfavorable) return { estado: "no-vigente", motivo: `estado «${estadoTexto}»${detalleFecha}` };
   if (activo === false && vencida) return { estado: "no-vigente", motivo: `marcado como inactivo y vencido el ${fmtFecha(vence)}` };
   if (activo === false) return { estado: "no-vigente", motivo: "marcado como inactivo por la institución" };
   if (vencida) return { estado: "no-vigente", motivo: `vencido el ${fmtFecha(vence)}` };
-  if (activo === true) return { estado: "vigente", motivo: vence ? `activo, vence el ${fmtFecha(vence)}` : "activo" };
+
+  if (activo === true) {
+    return { estado: "vigente", motivo: (estadoTexto ? `estado «${estadoTexto}»` : "activo") + detalleFecha };
+  }
+  // Sin indicador booleano pero con estado textual favorable y sin vencer
+  if (estadoTexto !== null && vence !== null) {
+    return { estado: "vigente", motivo: `estado «${estadoTexto}»${detalleFecha}` };
+  }
   return { estado: "desconocida", motivo: "" };
 }
 

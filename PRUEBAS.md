@@ -6,7 +6,7 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 
 | Banco de pruebas | Casos | Correctos | Fallidos |
 |---|---:|---:|---:|
-| 1 · Lógica pura | 76 | 76 | 0 |
+| 1 · Lógica pura | 87 | 87 | 0 |
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
 | 3 · Estructura y accesibilidad del DOM | 13 | 13 | 0 |
 | 4 · Comportamiento (manual modal, paneles, teclado) | 16 | 16 | 0 |
@@ -14,7 +14,7 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 | 6 · Recorrido exhaustivo (45 pasos, consola limpia) | 45 | 45 | 0 |
 | 7 · Navegador real (Chrome) | 58 | 58 | 0 |
 | 8 · Sitio publicado (URL pública real) | 10 | 10 | 0 |
-| **Total** | **248** | **248** | **0** |
+| **Total** | **259** | **259** | **0** |
 
 Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
 
@@ -447,7 +447,7 @@ Se confirman las tres propiedades buscadas: el código y el cuerpo originales se
 | Tipo de cambio actual | Cubierta | Banco 2 · Banco 3 · captura 02 |
 | Rango histórico válido e inválido | Cubierta | Banco 1 (12 casos) · Banco 2 · Banco 3 |
 | Autorización de exoneración válida y con formato incorrecto | Cubierta | Banco 1 · Banco 2 · Banco 3 · captura 03 |
-| Productor agropecuario encontrado y no encontrado | **Parcial** | Caso «no encontrado» verificado. No se localizó ningún caso positivo pese a probar más de treinta identificaciones y agotar cuatro vías externas (sección 0 bis). Véase `README.md`, advertencia 3. |
+| Productor agropecuario encontrado y no encontrado | **Cubierta** | Ambos casos verificados con datos reales del MAG. El caso «encontrado» reveló que la fecha de término se llama `fechaBajaMAG`: véase la sección 6 quinquies |
 | Registro pesquero encontrado y no encontrado | **Cubierta** | Ambos casos verificados con datos reales de INCOPESCA. El caso «encontrado» reveló un defecto grave, ya corregido: véase la sección 6 quinquies |
 | CABYS por código y por descripción | Cubierta | Banco 2 · Banco 3 · captura 04 |
 | Error HTTP 400 | Cubierta | Banco 2 (dos casos, con tráfico real) |

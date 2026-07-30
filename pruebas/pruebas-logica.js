@@ -198,11 +198,52 @@ check("vigencia", "el motivo explica por qué no está vigente",
 check("vigencia", "reconoce los campos del registro del MAG",
   ev({ indicadorActivoMAG: true, fechaVenceMAG: anioFuturo }).estado, "vigente");
 
+/*
+ * Estructura real del registro agropecuario. Los campos se llaman distinto
+ * que en los permisos de pesca: la fecha de término es «fechaBajaMAG», no
+ * «vence», y existe además «fechaAltaMAG», que es la fecha de inicio.
+ * Confundirlas invertiría por completo el resultado.
+ */
+const ASIENTO_MAG = {
+  nombreMAG: "NOMBRE DE EJEMPLO",
+  estadoMAG: "Activo",
+  fechaBajaMAG: anioFuturo,
+  indicadorActivoMAG: true,
+  fechaAltaMAG: anioPasado,
+  fuenteMAG: "MAG"
+};
+
+check("vigencia", "asiento del MAG activo y sin vencer es vigente",
+  ev(ASIENTO_MAG).estado, "vigente");
+check("vigencia", "usa fechaBaja como vencimiento, no fechaAlta",
+  ev({ ...ASIENTO_MAG, fechaBajaMAG: anioPasado, fechaAltaMAG: anioPasado }).estado, "no-vigente");
+check("vigencia", "no confunde la fecha de alta con un vencimiento",
+  /vence el/.test(ev(ASIENTO_MAG).motivo), true);
+check("vigencia", "un estado textual desfavorable manda sobre el indicador",
+  ev({ ...ASIENTO_MAG, estadoMAG: "Inactivo" }).estado, "no-vigente");
+check("vigencia", "también reconoce «Vencido» en el texto del estado",
+  ev({ ...ASIENTO_MAG, estadoMAG: "Vencido" }).estado, "no-vigente");
+check("vigencia", "acepta «Vigente» como estado favorable",
+  ev({ ...ASIENTO_MAG, estadoMAG: "Vigente" }).estado, "vigente");
+check("vigencia", "el motivo cita el estado y la fecha",
+  /Activo/.test(ev(ASIENTO_MAG).motivo), true);
+
+check("registros", "cuenta dos asientos de fuentes distintas",
+  cr({ listaDatosMAG: [ASIENTO_MAG, { ...ASIENTO_MAG, fuenteMAG: "SENASA" }] }).total, 2);
+check("registros", "la respuesta del agropecuario trae una sola lista",
+  cr({ listaDatosMAG: [ASIENTO_MAG] }).listas.length, 1);
+
 check("etiquetas", "las tres listas tienen etiqueta propia",
   ["listaDatosMAG", "listaDatosIncopesca", "listaDatosAcuicultores"]
     .every((k) => typeof g("ETIQUETAS_REGISTRO")[k] === "string"), true);
 check("etiquetas", "los campos de INCOPESCA tienen etiqueta legible",
   g("ETIQUETAS_REGISTRO").nombrePermisonarioIncopesca, "Nombre del permisionario");
+check("etiquetas", "los seis campos del MAG tienen etiqueta legible",
+  ["nombreMAG", "estadoMAG", "fechaAltaMAG", "fechaBajaMAG", "indicadorActivoMAG", "fuenteMAG"]
+    .every((k) => typeof g("ETIQUETAS_REGISTRO")[k] === "string"), true);
+check("etiquetas", "distingue «Inscrito el» de «Vence el»",
+  [g("ETIQUETAS_REGISTRO").fechaAltaMAG, g("ETIQUETAS_REGISTRO").fechaBajaMAG],
+  ["Inscrito el", "Vence el"]);
 
 /* ======================= 8. CONSTRUCCIÓN DE URL ========================== */
 const bu = g("buildUrl");

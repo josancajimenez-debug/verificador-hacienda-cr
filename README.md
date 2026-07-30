@@ -57,7 +57,7 @@ VERIFICADOR/
 │   └── server.js              ← Proxy equivalente en Node.js, sin dependencias.
 │
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
-    ├── pruebas-logica.js      ← 76 pruebas de validadores, normalizadores y registros.
+    ├── pruebas-logica.js      ← 87 pruebas de validadores, normalizadores y registros.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
     ├── pruebas-comportamiento.js ← 16 pruebas del manual modal, paneles y teclado.
@@ -437,7 +437,7 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 
 | Banco | Casos | Resultado |
 |---|---|---|
-| Lógica pura (validadores, normalizadores, clasificadores) | 76 | 76 correctos |
+| Lógica pura (validadores, normalizadores, clasificadores) | 87 | 87 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
 | Comportamiento (manual modal, paneles, teclado) | 16 | 16 correctos |
@@ -445,7 +445,7 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Recorrido exhaustivo (45 pasos, consola limpia) | 45 | 45 correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **248** | **248 correctos** |
+| **Total** | **259** | **259 correctos** |
 
 ### Pruebas automáticas en cada publicación
 
@@ -535,17 +535,30 @@ Esto obligó a corregir un **defecto grave**: la aplicación anunciaba «Registr
 
 La aplicación distingue ahora ambas cosas: el resultado indica «Figura en el registro (N asientos)» con distintivo neutro y, aparte, la **condición**, en verde sólo si algún asiento está activo y sin vencer. Si figura sin vigencia, un aviso en rojo explica el motivo concreto y advierte de no aplicar tratamientos reservados sin confirmarlo con la institución. El criterio es conservador: vigente sólo si el indicador es afirmativo **y** la fecha no ha pasado.
 
-**3. Del registro agropecuario sigue sin observarse un caso positivo.**
-Se probaron treinta y tantas identificaciones, incluida la que la propia documentación oficial usa como ejemplo (`2100042005`), cooperativas agrícolas y cédulas jurídicas y físicas variadas: todas devolvieron «no encontrado». Los registros parecen contener únicamente productores efectivamente inscritos. En consecuencia, la ruta de presentación de un resultado positivo se implementó de forma **genérica y defensiva**: se muestran los campos que efectivamente lleguen, con etiquetas derivadas del nombre de cada propiedad, sin agregar ni suponer ningún campo. Esta ruta no pudo ejercitarse con datos reales y así se hace constar.
+**3 ter. El registro agropecuario también está verificado con datos reales.**
+`/fe/agropecuario` devuelve una única lista, con nombres de campo distintos a los de pesca:
 
-*Vías exploradas para obtener un caso positivo, y por qué no prosperaron:*
+```json
+{ "listaDatosMAG": [ { "nombreMAG": "…",  "estadoMAG": "Activo",
+                       "fechaAltaMAG": "2026-06-17", "fechaBajaMAG": "2028-06-17",
+                       "indicadorActivoMAG": true,   "fuenteMAG": "MAG" } ] }
+```
 
-| Vía | Resultado |
-|---|---|
-| Repositorio XLSX de personas registradas que publica el MAG | El enlace `www.mag.go.cr/consulta/Registro-Persona-y-Establecimientos.xlsx` devuelve **404** en el propio sitio del MAG |
-| Consulta pública del MAG (`sistemasv2.mag.go.cr`) | Funciona, pero exige una cédula concreta: con la búsqueda vacía responde «Sin datos para mostrar». No permite listar |
-| Consulta de establecimientos con CVO de SENASA | Protegida con reCAPTCHA Enterprise; no procede eludirla |
-| Portal nacional de datos abiertos | No publica el registro de productores con identificaciones |
+Dos detalles obligaron a afinar la lógica de vigencia:
+
+- **La fecha de término se llama `fechaBajaMAG`, no «vence».** La versión anterior sólo buscaba campos con «vence», «vencimiento» o «expira», de modo que ignoraba la fecha y se apoyaba únicamente en el indicador booleano. Un asiento marcado como activo pero ya vencido se habría presentado como vigente.
+- **Junto a ella viaja `fechaAltaMAG`, que es la fecha de inicio.** Tomarla por vencimiento invertiría el resultado, así que se excluye expresamente.
+
+Se añadió además el estado textual (`estadoMAG`: «Activo», «Vigente») como señal adicional: un estado desfavorable manda sobre el indicador booleano, porque ante señales contradictorias no debe afirmarse la vigencia.
+
+Una misma identificación puede traer **varios asientos de fuentes distintas** —se observaron MAG y SENASA en la misma respuesta—, y cada uno se evalúa por separado. La columna «Registro de origen» muestra de cuál procede.
+
+**3. Limitación que se mantiene, ya acotada.**
+Los cuatro casos observados con datos reales fueron: dos permisos de INCOPESCA **inactivos y vencidos**, y dos registros del MAG **activos y vigentes**. No se ha observado todavía un asiento del MAG en estado desfavorable ni ningún registro de acuicultores, de modo que esas dos variantes se apoyan en la misma lógica pero no han podido comprobarse contra el servicio.
+
+La lógica de vigencia está construida para ser conservadora ante lo desconocido: si los campos no permiten determinar la condición, se indica «No determinable» y el aviso favorable no se emite. Las catorce pruebas de vigencia cubren las combinaciones de indicador, fecha y estado textual con datos ficticios.
+
+*Cómo se llegó a los casos positivos.* Las vías automatizables no prosperaron —el XLSX del registro devuelve **404** en el propio sitio del MAG, su consulta pública exige una cédula concreta y la de SENASA está tras reCAPTCHA—, de modo que los casos los aportó quien usa la herramienta. **Ninguna de esas identificaciones figura en el repositorio ni en las pruebas:** los bancos reproducen la estructura con datos ficticios.
 
 De esta exploración sí se obtuvieron dos resultados aprovechables, ya incorporados: la **regla del cero inicial** documentada más arriba, y los **nombres de campo del registro único** que muestra la herramienta del MAG (fuente de datos, tipo de registro, identificación, nombre de la persona productora, número de autorización, estado, fecha, vencimiento, dirección regional, agencia de extensión y tipo PYMPA), incorporados al diccionario de etiquetas. Ese diccionario sólo se aplica a las claves que realmente lleguen en la respuesta: no crea campos ni sugiere que existan.
 
