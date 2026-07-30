@@ -143,6 +143,14 @@ async function abrirNavegador(opciones = {}) {
     out.titulo = document.title;
     out.tieneViewport = !!document.querySelector('meta[name="viewport"]');
 
+    // --- 13. Catálogo de caché sincronizado con su control visible ---
+    const ttlDelSelector = [...document.querySelectorAll("#cfg-ttl option")]
+      .map((opcion) => Number(opcion.value));
+    out.ttlDesincronizados =
+      JSON.stringify(ttlDelSelector) === JSON.stringify([...TTL_ADMITIDOS])
+        ? []
+        : [`selector=[${ttlDelSelector.join(", ")}] · TTL_ADMITIDOS=[${[...TTL_ADMITIDOS].join(", ")}]`];
+
     return out;
   });
 
@@ -160,7 +168,8 @@ async function abrirNavegador(opciones = {}) {
     ["Imágenes con aspecto declarado erróneo", r.imgAspectoIncorrecto],
     ["Paneles anidados dentro de otro panel", r.panelesAnidados],
     ["Paneles que no cuelgan de <main>", r.panelesFueraDeMain],
-    ["Paneles cuyo primer control no se ve al activarlos", r.panelesConControlOculto]
+    ["Paneles cuyo primer control no se ve al activarlos", r.panelesConControlOculto],
+    ["TTL_ADMITIDOS distinto de #cfg-ttl", r.ttlDesincronizados]
   ];
   let problemas = 0;
   for (const [n, v] of lineas) {
@@ -176,4 +185,10 @@ async function abrirNavegador(opciones = {}) {
   console.log("=".repeat(78));
   console.log(problemas === 0 ? "Sin defectos estructurales." : `${problemas} incidencia(s) que revisar.`);
   await b.close();
-})().catch((e) => { console.error("ERROR:", e.message); process.exit(1); });
+
+  // Este banco corre en la integración continua. Si sólo imprimiera el informe
+  // y terminara con código 0, una regresión estructural (un id duplicado, una
+  // referencia ARIA rota, un panel anidado) dejaría la publicación en verde y
+  // el aviso pasaría inadvertido entre el resto de la salida.
+  process.exit(problemas === 0 ? 0 : 1);
+})().catch((e) => { console.error("ERROR:", e.message); process.exit(2); });

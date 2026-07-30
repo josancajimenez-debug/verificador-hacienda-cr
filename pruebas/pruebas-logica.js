@@ -273,6 +273,47 @@ check("catalogos", "tipo 02 = persona jurídica", g("TIPOS_IDENTIFICACION")["02"
 check("catalogos", "ruta oficial de /fe/ae", g("RUTAS").ae, "/fe/ae");
 check("catalogos", "origen oficial", g("API_BASE"), "https://api.hacienda.go.cr");
 
+/* ======================= 11. PREFERENCIAS PERSISTIDAS ====================
+ * Por el proxy pasan los números de identificación consultados y la duración
+ * de la caché gobierna cuánto viven en memoria. Ambos valores se leen de
+ * localStorage, que no es una fuente de confianza: puede traer restos de una
+ * versión anterior o haber sido manipulado. Se validan igual que al guardarlos.
+ */
+const ps = g("proxyEsSeguro");
+check("prefs", "acepta un proxy HTTPS", ps("https://mi-proxy.midominio.workers.dev"), true);
+check("prefs", "acepta HTTP en localhost", ps("http://localhost:8787"), true);
+check("prefs", "acepta HTTP en 127.0.0.1", ps("http://127.0.0.1:8787"), true);
+check("prefs", "rechaza HTTP en un dominio ajeno", ps("http://ajeno.example"), false);
+check("prefs", "rechaza el esquema javascript:", ps("javascript:alert(1)"), false);
+check("prefs", "rechaza el esquema ftp:", ps("ftp://ajeno.example"), false);
+check("prefs", "rechaza texto que no es una URL", ps("no-es-url"), false);
+check("prefs", "rechaza la cadena vacía", ps(""), false);
+check("prefs", "rechaza un valor no textual", ps(null), false);
+
+const nt = g("normalizarTtl");
+const TTL_PRED = g("TTL_PREDETERMINADO");
+check("prefs", "conserva una duración del catálogo", nt(1800000), 1800000);
+check("prefs", "conserva «sin caché» (0)", nt(0), 0);
+// Un valor ajeno al catálogo dejaba el <select> sin opción marcada; al guardar,
+// parseInt("") daba NaN y la caché se apagaba sin avisar.
+check("prefs", "sustituye una duración fuera del catálogo", nt(123456), TTL_PRED);
+check("prefs", "sustituye un valor negativo", nt(-1), TTL_PRED);
+check("prefs", "sustituye un valor no numérico", nt("mucho rato"), TTL_PRED);
+check("prefs", "sustituye undefined", nt(undefined), TTL_PRED);
+check("prefs", "la duración predeterminada pertenece al catálogo",
+  g("TTL_ADMITIDOS").includes(TTL_PRED), true);
+
+/* ======================= 12. VIGENCIA: ORDEN Y RÓTULOS ===================
+ * La columna «Vigencia» de las tablas de registro es un valor calculado, no un
+ * campo de la fila. Sus rótulos y su orden viven en constantes compartidas para
+ * que la tabla pueda ordenarla; sin ellas el encabezado no reordenaba nada.
+ */
+const EV = g("ETIQUETA_VIGENCIA");
+check("vigencia", "rótulo de estado vigente", EV["vigente"], "Vigente");
+check("vigencia", "rótulo de estado no vigente", EV["no-vigente"], "No vigente");
+check("vigencia", "rótulo de estado desconocido", EV["desconocida"], "No determinable");
+check("vigencia", "hay un rótulo por cada estado posible", Object.keys(EV).length, 3);
+
 /* ======================= INFORME ======================================== */
 console.log("\n" + "=".repeat(72));
 const grupos = [...new Set(casos.map((c) => c.grupo))];

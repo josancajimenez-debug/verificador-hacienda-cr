@@ -57,10 +57,10 @@ VERIFICADOR/
 │   └── server.js              ← Proxy equivalente en Node.js, sin dependencias.
 │
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
-    ├── pruebas-logica.js      ← 87 pruebas de validadores, normalizadores y registros.
+    ├── pruebas-logica.js      ← 107 pruebas de validadores, normalizadores, registros y preferencias.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
-    ├── pruebas-comportamiento.js ← 28 pruebas del manual modal, acceso admin, paneles y teclado.
+    ├── pruebas-comportamiento.js ← 35 pruebas del manual modal, acceso admin, paneles y teclado.
     ├── pruebas-navegador.js   ← 58 pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-calidad.js     ← 14 pruebas de memoria, seguridad y contraste.
     ├── pruebas-recorrido.js   ← 46 pasos por toda la interfaz, sin tolerar errores.
@@ -437,15 +437,15 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 
 | Banco | Casos | Resultado |
 |---|---|---|
-| Lógica pura (validadores, normalizadores, clasificadores) | 87 | 87 correctos |
+| Lógica pura (validadores, normalizadores, clasificadores, preferencias) | 107 | 107 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
-| Comportamiento (manual modal, acceso admin, paneles, teclado) | 28 | 28 correctos |
+| Comportamiento (manual modal, acceso admin, paneles, teclado) | 35 | 35 correctos |
 | Calidad: memoria, seguridad y contraste | 14 | 14 correctos |
 | Recorrido exhaustivo (46 pasos, consola limpia) | 46 | 46 correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **272** | **272 correctos** |
+| **Total** | **299** | **299 correctos** |
 
 ### Pruebas automáticas en cada publicación
 
@@ -487,7 +487,7 @@ node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
 
 **Cambiar el ritmo de consultas.** Ajuste `limiter.minIntervalMs` y `limiter.maxConcurrent` (§ 6). Nunca supere 10 solicitudes por segundo sostenidas.
 
-**Cambiar la duración predeterminada de la caché.** Modifique `prefs.ttl` (§ 4) o utilice el selector de Configuración avanzada.
+**Cambiar la duración predeterminada de la caché.** Utilice el selector de Configuración avanzada o, para cambiar el valor de fábrica, modifique `TTL_PREDETERMINADO` (§ 4). Si añade una duración nueva, agréguela **a la vez** a `TTL_ADMITIDOS` y a las opciones del `<select id="cfg-ttl">`: esa constante es la lista blanca con la que se validan las preferencias leídas de `localStorage`, y una duración que no figure en ella se sustituye por la predeterminada.
 
 **Acceso a la configuración avanzada.** La contraseña de reparto es `Admin-ACC-2026!`. El navegador la verifica mediante PBKDF2-SHA-256 (210 000 iteraciones); sólo la sal y el hash están en `ADMIN_AUTH`, la contraseña nunca se guarda en texto legible, y el desbloqueo vive en `sessionStorage` hasta cerrar la pestaña o pulsar «Cerrar admin».
 

@@ -1,22 +1,73 @@
 # Evidencia de pruebas — Verificador Hacienda CR
 
-Fecha de ejecución: **29 de julio de 2026**
+Fecha de ejecución: **30 de julio de 2026**
 Entorno: Windows 11 Pro · Node.js v24.18.0 · Google Chrome (Playwright 1.62)
 API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos simulados)
 
 | Banco de pruebas | Casos | Correctos | Fallidos |
 |---|---:|---:|---:|
-| 1 · Lógica pura | 87 | 87 | 0 |
+| 1 · Lógica pura | 107 | 107 | 0 |
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
 | 3 · Estructura y accesibilidad del DOM | 13 | 13 | 0 |
-| 4 · Comportamiento (manual modal, acceso admin, paneles, teclado) | 28 | 28 | 0 |
+| 4 · Comportamiento (manual modal, acceso admin, paneles, teclado) | 35 | 35 | 0 |
 | 5 · Calidad: memoria, seguridad y contraste | 14 | 14 | 0 |
 | 6 · Recorrido exhaustivo (46 pasos, consola limpia) | 46 | 46 | 0 |
 | 7 · Navegador real (Chrome) | 58 | 58 | 0 |
 | 8 · Sitio publicado (URL pública real) | 10 | 10 | 0 |
-| **Total** | **272** | **272** | **0** |
+| **Total** | **299** | **299** | **0** |
 
 Todos los bancos son reproducibles; los comandos figuran al final de cada sección.
+
+---
+
+## Revisión integral del 30 de julio de 2026
+
+Auditoría completa del código (marcado, estilos, script, proxy y bancos de
+prueba) en busca de defectos de lógica, presentación, rendimiento y seguridad.
+Se corrigieron **nueve defectos**, todos reproducidos antes de tocar el código y
+verificados después. Los cinco primeros afectaban a lo que ve la persona usuaria.
+
+| # | Defecto | Causa raíz | Efecto observado |
+|---|---|---|---|
+| 1 | La consulta tributaria anunciaba éxito sobre un panel vacío | `initTributaria` mostraba el aviso favorable sin comprobar si `renderTributaria` llegó a pintar algo; la advertencia de la función se borraba acto seguido | Con un cuerpo JSON válido pero sin ficha (`null`, un arreglo, un número) se leía «✅ Consulta realizada» sin ningún dato |
+| 2 | Se restauraba un proxy inseguro desde `localStorage` | La validación de esquema sólo existía en la ruta de guardado, no en la de lectura | Un valor persistido por una versión anterior o manipulado desviaba **todas** las consultas —con los números de identificación— a un servidor arbitrario |
+| 3 | Una duración de caché fuera del catálogo apagaba la caché en silencio | `loadPrefs` aceptaba cualquier número; el `<select>` quedaba sin opción marcada y `parseInt("")` daba `NaN`, que `\|\| 0` convertía en «sin caché» | El desplegable aparecía en blanco y, al guardar, se perdía la caché sin aviso |
+| 4 | El campo CABYS conservaba la marca de error al cambiar de modalidad | `sincronizarModoCabys` limpiaba el mensaje pero no el `aria-invalid` de los dos campos | El campo volvía a mostrarse con borde rojo y anunciado como inválido, sin mensaje que lo explicara |
+| 5 | La columna «Vigencia (cálculo local)» no ordenaba | Es un valor derivado, no un campo de la fila: sin `sortValue`, el orden leía `fila["_vigencia"]` (`undefined`) en todas las filas | El encabezado se comportaba como un botón que no hacía nada |
+| 6 | El plazo de espera corría durante la cola del limitador | El temporizador se armaba antes de `limiter.run`, no dentro de la tarea | Con varias consultas encoladas, una podía agotar su plazo sin haberse enviado, y el mensaje culpaba al Ministerio |
+| 7 | La sonda de conectividad dejaba temporizadores pendientes | `clearTimeout` sólo estaba en la ruta de éxito | Un temporizador de 8 s por cada sonda fallida |
+| 8 | Un impuesto CABYS no numérico envenenaba el orden | `Number("n/a")` daba `NaN`, que se filtraba como celda vacía pero rompía las comparaciones | Orden indefinido en la columna IVA |
+| 9 | El banco estructural nunca hacía fallar la integración continua | Imprimía las incidencias y terminaba siempre con código 0 | Una regresión estructural (id duplicado, referencia ARIA rota, panel anidado) dejaba la publicación en verde |
+
+### Cómo se verificó cada corrección
+
+Los defectos 1 a 5 se reprodujeron en Chrome con una sonda dirigida antes de
+corregir nada, y las mismas comprobaciones se incorporaron a los bancos
+permanentes para que no puedan repetirse:
+
+| Defecto | Antes | Después | Prueba que lo fija |
+|---|---|---|---|
+| 1 | `«✅ Consulta realizada»` con 0 elementos | `«⚠️ Respuesta vacía»` | Banco 4 · 3 casos (`null`, arreglo, número) |
+| 2 | `prefs.proxy = "http://atacante.example"` | `prefs.proxy = ""` | Banco 1 · 9 casos de `proxyEsSeguro` |
+| 3 | `value=""`, `selectedIndex=-1`, guardar → `ttl=0` | `value="600000"`, guardar → `ttl=600000` | Banco 1 · 7 casos de `normalizarTtl` |
+| 4 | `aria-invalid="true"` persistía | atributo ausente | Banco 4 · 2 casos |
+| 5 | `[Ana, Beto, Cira]` → `[Ana, Beto, Cira]` | `[Vigente, No vigente, No vigente]` | Banco 4 · 2 casos |
+
+### Limpieza aplicada en la misma revisión
+
+- Se retiró el atributo `data-panel` de las seis pestañas: ningún código lo leía
+  (la navegación se resuelve con `aria-controls`).
+- Se retiró el campo `_origen` de las filas de CABYS: se copiaba el objeto
+  completo de la API en cada fila sin que nada lo consultara.
+- Se trasladaron a clases los diez estilos en línea que quedaban en el marcado y
+  los dos que el script aplicaba por `element.style`. El marcado ya no contiene
+  ningún atributo `style`. Se comprobó con una sonda de estilos calculados que
+  cada clase reproduce exactamente el valor anterior; el proceso detectó que
+  `legend.modo-busqueda__titulo` necesitaba cualificarse con el elemento para no
+  perder ante `.dl__k`, que fija su propio margen.
+- `hoyISO()` pasó del módulo de tipo de cambio a las utilidades de fecha, junto a
+  `fmtFecha` e `isoDatePart`, que es donde se usa. `fileStamp()` dejó de duplicar
+  el relleno de dos dígitos y ahora lee el reloj una sola vez.
 
 ---
 

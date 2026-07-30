@@ -240,6 +240,74 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   check("El manual se adapta sin desbordar entre 320 y 1280 px",
     desbordes.length === 0, desbordes.length ? desbordes.join(" | ") : anchuras.join(", ") + " px comprobadas");
 
+  await p.setViewportSize({ width: 1280, height: 900 });
+
+  /* ---------- Regresión · una respuesta no interpretable no se anuncia como éxito ----
+   * /fe/ae devuelve un objeto con la ficha del contribuyente. Un JSON válido
+   * pero sin ficha (null, un arreglo, un número) no es un resultado, y el aviso
+   * favorable llegaba a taparle su advertencia dejando «Consulta realizada»
+   * sobre un panel vacío.
+   */
+  await p.click("#tab-tributaria");
+  for (const [cuerpo, nombre] of [["null", "null"], ["[]", "un arreglo"], ["123", "un número"]]) {
+    const r = await p.evaluate(async (c) => {
+      const original = window.fetch;
+      window.fetch = async () => new Response(c, { status: 200, headers: { "Content-Type": "application/json" } });
+      document.getElementById("in-tributaria").value = "3101012386";
+      document.getElementById("form-tributaria").dispatchEvent(new Event("submit", { cancelable: true }));
+      await new Promise((r) => setTimeout(r, 500));
+      window.fetch = original;
+      cacheClear();
+      return document.getElementById("alert-tributaria").textContent.trim();
+    }, cuerpo);
+    check(`Un cuerpo con ${nombre} no se anuncia como consulta correcta`,
+      /Respuesta vacía/.test(r) && !/Consulta realizada/.test(r), `aviso mostrado: «${r.slice(0, 52)}…»`);
+  }
+  await p.evaluate(() => { limpiarModulo("tributaria"); });
+
+  /* ---------- Regresión · CABYS: la marca de campo inválido no sobrevive al cambio de modalidad ---- */
+  await p.click("#tab-cabys");
+  const cabys = await p.evaluate(() => {
+    document.getElementById("in-cabys-codigo").value = "123";   // menos de 13 dígitos
+    document.getElementById("form-cabys").dispatchEvent(new Event("submit", { cancelable: true }));
+    const trasError = document.getElementById("in-cabys-codigo").getAttribute("aria-invalid");
+    const radio = document.querySelector('input[name="cabys-modo"][value="descripcion"]');
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
+    return { trasError, trasCambio: document.getElementById("in-cabys-codigo").getAttribute("aria-invalid") };
+  });
+  check("Un código inválido marca el campo como aria-invalid",
+    cabys.trasError === "true", `aria-invalid=${cabys.trasError}`);
+  check("La marca de inválido se retira al cambiar de modalidad",
+    cabys.trasCambio === null, `aria-invalid=${cabys.trasCambio ?? "(ausente)"} tras pasar a «Por descripción»`);
+  await p.evaluate(() => { limpiarModulo("cabys"); });
+
+  /* ---------- Regresión · la columna «Vigencia» sí reordena la tabla ---------- */
+  await p.click("#tab-agro");
+  const orden = await p.evaluate(() => {
+    renderRegistro(
+      { outId: "out-agro", alertId: "alert-agro", csvBase: "prueba",
+        institucion: "MAG", tituloResultado: "t", tituloNoEncontrado: "n", textoNoEncontrado: "t" },
+      { listaDatosMAG: [
+        { nombreMAG: "Ana",  indicadorActivoMAG: false, fechaVenceMAG: "2020-01-01T00:00:00" },
+        { nombreMAG: "Beto", indicadorActivoMAG: true,  fechaVenceMAG: "2099-01-01T00:00:00" },
+        { nombreMAG: "Cira", indicadorActivoMAG: false, fechaVenceMAG: "2019-01-01T00:00:00" }
+      ] },
+      "123456789");
+    const leer = () => [...document.querySelectorAll("#out-agro table.data tbody tr")]
+      .map((tr) => tr.lastElementChild.textContent);
+    const antes = leer();
+    [...document.querySelectorAll("#out-agro thead .th-sort")]
+      .find((b) => /Vigencia/.test(b.textContent)).click();
+    return { antes, despues: leer() };
+  });
+  check("La columna «Vigencia» reordena realmente las filas",
+    JSON.stringify(orden.antes) !== JSON.stringify(orden.despues),
+    `antes: ${orden.antes.join(", ")} → después: ${orden.despues.join(", ")}`);
+  check("Al ordenar, los asientos vigentes quedan primero",
+    orden.despues[0] === "Vigente", `primera fila: «${orden.despues[0]}»`);
+  await p.evaluate(() => { limpiarModulo("agro"); });
+
   console.log("=".repeat(96));
   console.log(`TOTAL: ${ok} superadas, ${ko} fallidas`);
   await b.close();
