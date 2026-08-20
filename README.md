@@ -126,13 +126,16 @@ Los datos se descargaron directamente del CSV oficial que publica el MEIC (mismo
 
 Para la condición vigente el día de la consulta (este listado es una fotografía fija del 31 de julio de 2026, no se actualiza sola), el botón "Ver publicación oficial" del propio módulo lleva a la página de transparencia del MEIC, en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls). El MEIC también publica, en `meic.go.cr/tramites-y-servicios/pymes-activas/`, una tabla en vivo (buscable por nombre o cédula, actualizada a diario) con el mismo registro; no es la página enlazada por el módulo —se prefirió apuntar a la fuente de transparencia oficial que referencia la bibliografía—, pero es la opción a considerar si en el futuro se prioriza esa tabla en vivo sobre la descarga del listado mensual completo.
 
+### Verificar comprobante · acceso directo en la barra de pestañas (sin panel propio)
+
+Al final de la barra de pestañas, marcado con ↗ y borde discontinuo para distinguirlo de un módulo real, hay un enlace «Verificar comprobante» que no abre un panel de consulta: lleva directamente al verificador oficial de comprobantes electrónicos del Ministerio de Hacienda, en `ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/`.
+
 ### Accesos externos de la cabecera
 
-Además de los nueve módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+Además de los nueve módulos de consulta y del enlace «Verificar comprobante», la barra de herramientas ofrece un acceso que **no es un endpoint**: un enlace que se abre en una pestaña nueva, con `rel="noopener noreferrer"`.
 
 | Botón | Destino | Para qué sirve |
 |---|---|---|
-| ✅ Verificar comprobante | `ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/` | Verificador oficial de comprobantes electrónicos del Ministerio de Hacienda |
 | 💬 Asistente virtual | `josancajimenez-debug.github.io/acc-asistente/` | Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica |
 
 El Asistente virtual está también accesible desde el pie de página, junto a los datos de contacto, para quien llegue al final de una consulta y necesite acompañamiento profesional para interpretar el resultado.
