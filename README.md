@@ -59,11 +59,11 @@ VERIFICADOR/
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
     ├── pruebas-logica.js      ← 107 pruebas de validadores, normalizadores, registros y preferencias.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
-    ├── pruebas-estructura.js  ← 13 auditorías del DOM (ids, ARIA, anidamiento, alt…).
+    ├── pruebas-estructura.js  ← 14 auditorías del DOM (ids, ARIA, anidamiento, alt…).
     ├── pruebas-comportamiento.js ← 35 pruebas del manual modal, acceso admin, paneles y teclado.
     ├── pruebas-navegador.js   ← 58 pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-calidad.js     ← 14 pruebas de memoria, seguridad y contraste.
-    ├── pruebas-recorrido.js   ← 46 pasos por toda la interfaz, sin tolerar errores.
+    ├── pruebas-recorrido.js   ← 48 pasos por toda la interfaz, sin tolerar errores.
     ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
@@ -75,7 +75,7 @@ El archivo está dividido en dieciséis secciones numeradas y comentadas. Busque
 | Sección | Contenido |
 |---|---|
 | § 1 | Estilos: tokens de diseño, temas claro/oscuro, componentes, adaptación móvil |
-| § 2 | Marcado de la interfaz (encabezado, pestañas, seis paneles, pie) |
+| § 2 | Marcado de la interfaz (encabezado, pestañas, ocho paneles, pie) |
 | § 3 | Utilidades DOM y de formato (`el()`, fechas, números, CSV, portapapeles) |
 | § 4 | Configuración, rutas oficiales y catálogos |
 | § 5 | Caché temporal en memoria |
@@ -83,7 +83,7 @@ El archivo está dividido en dieciséis secciones numeradas y comentadas. Busque
 | § 7 | Cliente HTTP: `apiGet()`, errores tipificados, timeout, reintentos, sonda CORS |
 | § 8 | Componente `DataTable`: filtro, orden, paginación, CSV, copiado |
 | § 9 | Infraestructura de interfaz: pestañas, tema, alertas, estado de red |
-| § 10–15 | Un bloque por módulo (validación → consulta → presentación) |
+| § 10–15C | Un bloque por módulo, ocho en total (validación → consulta → presentación) |
 | § 16 | Arranque |
 
 Cada módulo sigue siempre el mismo patrón, lo que facilita añadir uno nuevo:
@@ -112,9 +112,13 @@ Todos apuntan al origen `https://api.hacienda.go.cr`. No se emplea ningún servi
 
 A diferencia de los módulos anteriores, este no consulta ninguna API: busca sobre una lista de 703 registros transcrita de los cuatro anexos del Decreto Ejecutivo N.º 41824-H-MAG (insumos agropecuarios y veterinarios, maquinaria, insumos de pesca no deportiva y servicios a productores de Canasta Básica Tributaria), embebida en el propio `index.html`. Funciona sin conexión. El botón «Ver texto oficial y conceptos» abre el texto completo de la norma en SINALEVI (Procuraduría General de la República) en una pestaña nueva; es, junto con «Verificar comprobante» y «Asistente virtual», uno de los pocos enlaces de navegación externos que la aplicación ofrece de forma deliberada (véase la sección siguiente).
 
+### Módulo 8 · Reglamento de CBTBIF (búsqueda local)
+
+Igual que el módulo anterior, no consulta ninguna API: busca sobre una lista de 236 bienes transcrita del artículo 5 del texto vigente del Decreto Ejecutivo N.º 43790-H-MEIC-S, que reglamenta la lista de bienes de la Canasta Básica Tributaria por el Bienestar Integral de las Familias (CBTBIF) creada por la Ley N.º 9914, agrupados en sus 20 categorías oficiales (panes y cereales, lácteos, carnes, aceites, frutas y vegetales, artículos de higiene y limpieza del hogar, entre otras), embebida en el propio `index.html`. Funciona sin conexión. El botón «Ver texto oficial y conceptos» abre el texto completo de la norma en SINALEVI en una pestaña nueva, con la misma naturaleza de enlace de navegación deliberado que el del Módulo 7.
+
 ### Accesos externos de la cabecera
 
-Además de los seis módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+Además de los ocho módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
 
 | Botón | Destino | Para qué sirve |
 |---|---|---|
