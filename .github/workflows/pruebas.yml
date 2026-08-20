@@ -6,22 +6,29 @@
 #
 # QUÉ SE EJECUTA AQUÍ Y QUÉ NO, Y POR QUÉ
 # ---------------------------------------
-# Sólo corren los tres bancos que NO consultan api.hacienda.go.cr:
+# Job "sin-red" — sólo los tres bancos que NO consultan api.hacienda.go.cr:
 #
 #   · pruebas-logica.js         validadores y normalizadores (sin red)
 #   · pruebas-estructura.js     DOM, ARIA, anidamiento de paneles (sin red)
 #   · pruebas-comportamiento.js manual, acceso admin, paneles, teclado (sin red)
 #
-# Los bancos que sí consultan la API (api, calidad, recorrido, navegador y
-# sitio) se ejecutan a propósito SÓLO en el equipo de la persona que desarrolla.
+# Los bancos que sí consultan la API de Hacienda (api, calidad, recorrido,
+# navegador y sitio) se ejecutan a propósito SÓLO en el equipo de la persona
+# que desarrolla. El motivo no es el tiempo, sino la política de uso del
+# Ministerio de Hacienda: bloquea por dirección IP y advierte expresamente del
+# riesgo de las «arquitecturas en la nube, donde cientos de clientes acceden
+# desde un mismo servidor, concentrando el tráfico en una sola IP». Los
+# runners de GitHub comparten sus direcciones entre miles de proyectos:
+# lanzar consultas desde ahí es justamente ese anti-patrón, y un bloqueo
+# afectaría a terceros ajenos a este proyecto.
 #
-# El motivo no es el tiempo, sino la política de uso del Ministerio de
-# Hacienda: bloquea por dirección IP y advierte expresamente del riesgo de las
-# «arquitecturas en la nube, donde cientos de clientes acceden desde un mismo
-# servidor, concentrando el tráfico en una sola IP». Los runners de GitHub
-# comparten sus direcciones entre miles de proyectos: lanzar consultas desde
-# ahí es justamente ese anti-patrón, y un bloqueo afectaría a terceros ajenos
-# a este proyecto.
+# Job "membresia" — pruebas-membresia.js SÍ toca red real, pero contra un
+# proyecto Supabase dedicado exclusivamente a pruebas (nunca el de
+# producción). A diferencia de Hacienda, Supabase no bloquea por IP
+# compartida, así que este banco sí corre en CI, usando tres secretos del
+# repositorio (Settings → Secrets → Actions): SUPABASE_TEST_URL,
+# SUPABASE_TEST_ANON_KEY y SUPABASE_TEST_SERVICE_ROLE_KEY. Si no están
+# configurados, el banco se omite con un aviso en vez de fallar.
 #
 # Antes de publicar, ejecute en su equipo la suite completa:
 #     npm test
@@ -85,14 +92,16 @@ jobs:
           fi
           echo "Sin APIs de inserción de HTML"
 
-      - name: Comprobar que no se cargan recursos externos
+      - name: Comprobar que no se cargan recursos externos fuera de la allowlist
         run: |
-          # La aplicación debe seguir siendo un archivo autónomo
-          if grep -oE '(src|href)="https?://[^"]*"' index.html | grep -vE '(api\.hacienda\.go\.cr/docs|ovitribucr\.hacienda\.go\.cr|josancajimenez-debug\.github\.io|sinalevi\.go\.cr|meic\.go\.cr)'; then
+          # La aplicación debe seguir siendo un archivo autónomo. cdn.jsdelivr.net
+          # es la única excepción: sirve el SDK de Supabase que la membresía
+          # necesita (ver README, sección de arquitectura).
+          if grep -oE '(src|href)="https?://[^"]*"' index.html | grep -vE '(api\.hacienda\.go\.cr/docs|ovitribucr\.hacienda\.go\.cr|josancajimenez-debug\.github\.io|sinalevi\.go\.cr|meic\.go\.cr|cdn\.jsdelivr\.net)'; then
             echo "Hay un recurso externo que no es un enlace de navegación"
             exit 1
           fi
-          echo "Sin dependencias externas"
+          echo "Sin dependencias externas fuera de la allowlist"
 
       - name: Banco 1 · Lógica pura
         run: npm run test:logica
@@ -102,3 +111,30 @@ jobs:
 
       - name: Banco 4 · Comportamiento (manual, acceso admin, paneles, teclado)
         run: npm run test:comportamiento
+
+  membresia:
+    name: Membresía (Supabase de pruebas)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Banco 8 · Membresía (registro, pago, confirmación admin, bloqueo)
+        env:
+          SUPABASE_TEST_URL: ${{ secrets.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_ANON_KEY: ${{ secrets.SUPABASE_TEST_ANON_KEY }}
+          SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+        run: npm run test:membresia

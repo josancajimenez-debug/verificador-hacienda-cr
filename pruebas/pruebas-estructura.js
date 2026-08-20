@@ -4,7 +4,8 @@
  */
 const { chromium } = require("playwright");
 const path = require("node:path");
-const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
+const { cargarConSesionSimulada } = require("./_membresia-simulada.js");
+const RUTA_INDEX = path.resolve(process.argv[2]);
 
 /**
  * Abre Google Chrome si está instalado y, si no, el Chromium que incluye
@@ -26,7 +27,10 @@ async function abrirNavegador(opciones = {}) {
   p.on("console", (m) => { if (m.type() === "error") consola.push("console.error: " + m.text()); });
   p.on("requestfailed", (r) => consola.push("PETICIÓN FALLIDA: " + r.url().slice(0, 120)));
 
-  await p.goto(APP, { waitUntil: "load" });
+  // La app vive detrás de la membresía: se simula una sesión con plan
+  // vigente (sin tocar Supabase real) para poder seguir auditando el DOM
+  // ya construido dentro de #contenido, como antes de la compuerta.
+  await cargarConSesionSimulada(p, RUTA_INDEX, { role: "admin" });
   await p.waitForTimeout(600);
 
   const r = await p.evaluate(() => {

@@ -4,7 +4,9 @@ Aplicación web para consultar información pública mediante las **API oficiale
 
 Referencia técnica única: <https://api.hacienda.go.cr/docs>
 
-**Un único archivo `index.html`, verdaderamente autónomo**: HTML, CSS, JavaScript, el logo de ACC Contadores y el icono del sitio van todos dentro. Sin dependencias, sin compilación, sin backend y sin ningún archivo vecino. Funciona en computadoras, tabletas y teléfonos móviles.
+**Un único archivo `index.html`, sin compilación ni archivos vecinos**: HTML, CSS, JavaScript, el logo de ACC Contadores y el icono del sitio van todos dentro. Funciona en computadoras, tabletas y teléfonos móviles.
+
+**Acceso por membresía mensual.** Toda la aplicación queda detrás de un inicio de sesión: sólo puede usarla quien tenga una membresía activa (₡5.000 por mes calendario, pago por transferencia/depósito/SINPE confirmado manualmente por un administrador). El respaldo es [Supabase](https://supabase.com) (Postgres + Auth + Row Level Security) — es la única dependencia externa real del proyecto; sin ella el archivo sigue siendo autónomo para todo lo demás, pero nadie puede entrar. Vea la [sección 14](#14-membresía-mensual-supabase) para ponerla en marcha.
 
 > **Nota sobre el tamaño.** El archivo pesa cerca de 12&nbsp;MB porque el [Módulo 9](#módulo-9--pymes-activas-búsqueda-local) incrusta 38&nbsp;106 registros del registro nacional de PYMES activas para poder buscarlos sin conexión. Es una decisión deliberada, no un descuido: los demás módulos pesan lo normal para un sitio de este tipo.
 
@@ -25,6 +27,7 @@ Referencia técnica única: <https://api.hacienda.go.cr/docs>
 11. [Pruebas](#11-pruebas)
 12. [Mantenimiento](#12-mantenimiento)
 13. [Advertencias y limitaciones conocidas](#13-advertencias-y-limitaciones-conocidas)
+14. [Membresía mensual (Supabase)](#14-membresía-mensual-supabase)
 
 ---
 
@@ -54,6 +57,10 @@ VERIFICADOR/
 ├── README.md                  ← Este documento.
 ├── PRUEBAS.md                 ← Resultados y evidencia de las pruebas.
 │
+├── supabase/
+│   └── schema.sql              ← Esquema, RLS y funciones de la membresía. Se ejecuta
+│                                  una sola vez en el SQL Editor de su proyecto Supabase.
+│
 ├── proxy/                     ← OPCIONAL. No se necesita para el uso normal.
 │   ├── worker.js              ← Proxy para Cloudflare Workers.
 │   └── server.js              ← Proxy equivalente en Node.js, sin dependencias.
@@ -61,12 +68,15 @@ VERIFICADOR/
 └── pruebas/                   ← Bancos de prueba reproducibles y evidencia.
     ├── pruebas-logica.js      ← 107 pruebas de validadores, normalizadores, registros y preferencias.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
-    ├── pruebas-estructura.js  ← 14 auditorías del DOM (ids, ARIA, anidamiento, alt…).
-    ├── pruebas-comportamiento.js ← 35 pruebas del manual modal, acceso admin, paneles y teclado.
-    ├── pruebas-navegador.js   ← 58 pruebas en Chrome (interfaz, a11y, móvil).
-    ├── pruebas-calidad.js     ← 14 pruebas de memoria, seguridad y contraste.
-    ├── pruebas-recorrido.js   ← 49 pasos por toda la interfaz, sin tolerar errores.
-    ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
+    ├── pruebas-estructura.js  ← Auditorías del DOM (ids, ARIA, anidamiento, alt…).
+    ├── pruebas-comportamiento.js ← Manual modal, acceso admin, paneles y teclado.
+    ├── pruebas-navegador.js   ← Pruebas en Chrome (interfaz, a11y, móvil).
+    ├── pruebas-calidad.js     ← Memoria, seguridad y contraste.
+    ├── pruebas-recorrido.js   ← Recorrido exhaustivo de la interfaz, sin tolerar errores.
+    ├── pruebas-membresia.js   ← Registro, pago, confirmación admin y bloqueo (Supabase real de pruebas).
+    ├── pruebas-sitio-publicado.js ← Pruebas contra la URL pública ya desplegada.
+    ├── _membresia-simulada.js ← Ayuda compartida: simula una sesión de Supabase sin red real,
+    │                              para que el resto de los bancos "sin red" sigan siéndolo.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
 
@@ -85,6 +95,7 @@ El archivo está dividido en dieciséis secciones numeradas y comentadas. Busque
 | § 7 | Cliente HTTP: `apiGet()`, errores tipificados, timeout, reintentos, sonda CORS |
 | § 8 | Componente `DataTable`: filtro, orden, paginación, CSV, copiado |
 | § 9 | Infraestructura de interfaz: pestañas, tema, alertas, estado de red |
+| § 9B | Membresía y autenticación: portal de acceso, Supabase Auth, panel admin de pagos |
 | § 10–15D | Un bloque por módulo, nueve en total (validación → consulta → presentación) |
 | § 16 | Arranque |
 
@@ -250,7 +261,9 @@ Access-Control-Allow-Origin: *
 X-Origin-App: api.hacienda.go.cr
 ```
 
-Por lo tanto se entrega **un `index.html` sin backend**, tal como es preferible: publicable en GitHub Pages y compartible mediante un simple enlace, con todo el código integrado en el propio archivo.
+Por lo tanto **la consulta a Hacienda en sí no requiere backend propio**: `index.html` sigue siendo publicable en GitHub Pages y compartible mediante un simple enlace, con todo ese código integrado en el propio archivo.
+
+**Esto es independiente de la membresía.** El acceso a la aplicación (registro, login, pagos, bloqueo por vencimiento) sí necesita un lugar donde guardar usuarios y contraseñas de forma segura y persistente entre dispositivos — algo que un archivo estático no puede hacer por sí solo. Para eso se usa Supabase (sección 14): la razón por la que un `index.html` sin backend basta para *consultar Hacienda* no aplica a *quién puede entrar a hacerlo*, que es un problema distinto.
 
 **Matiz importante y verificado.** Las respuestas **400** y **404** no las genera la aplicación de origen sino la capa estática de Akamai, y **no** incluyen cabeceras CORS:
 
@@ -425,12 +438,13 @@ Ante una estructura no reconocida, la aplicación **nunca inventa una interpreta
 
 ## 9. Protección de datos personales
 
-- **No se almacena ningún número de identificación.** La caché reside exclusivamente en un `Map` en memoria: desaparece al recargar la página, al cerrar la pestaña o al pulsar «Limpiar caché».
-- **No se usan `localStorage` ni `sessionStorage` para datos de consulta.** En `localStorage` sólo se guarda la clave `verificadorHaciendaCR.prefs`, con tres valores no personales: tema visual, duración de la caché y, si se configura, la dirección del proxy propio. Comprobado automáticamente (véase `PRUEBAS.md`).
-- **No se envía información a terceros.** El único destino de las peticiones es `api.hacienda.go.cr`, o el proxy que usted mismo despliegue.
-- **Sin analítica, sin cookies propias, sin recursos externos.** La página no carga fuentes, scripts ni imágenes de otros dominios; se declara `referrer: no-referrer`.
-- **Las credenciales del navegador no se envían:** todas las peticiones usan `credentials: "omit"`.
-- **Prevención de inyección de contenido:** ningún dato recibido de la API se inserta con `innerHTML`. Todo el contenido dinámico se construye con `document.createElement` y `textContent`.
+- **No se almacena ningún número de identificación consultado.** La caché de resultados reside exclusivamente en un `Map` en memoria: desaparece al recargar la página, al cerrar la pestaña o al pulsar «Limpiar caché».
+- **`localStorage` sólo guarda dos cosas, ninguna un dato de consulta.** La clave `verificadorHaciendaCR.prefs` (tema visual, duración de la caché y, si se configura, la dirección del proxy propio) y, únicamente si el navegador tiene una sesión de membresía abierta, la clave de sesión propia del SDK de Supabase (`sb-<referencia-del-proyecto>-auth-token`) — un token de acceso, no datos de las consultas que usted haga dentro de la app. Comprobado automáticamente (véase `PRUEBAS.md`).
+- **El destino de las peticiones son dos, y ambos declarados aquí.** `api.hacienda.go.cr` (o el proxy que usted mismo despliegue) para las consultas, y su propio proyecto Supabase para el inicio de sesión y el estado de la membresía. Ningún otro tercero recibe tráfico de la aplicación.
+- **Datos personales del registro (nombre, cédula, teléfono, correo y, si aplica, dirección y actividad económica) sólo se guardan en su proyecto Supabase**, protegidos por Row Level Security: cada quien sólo puede leer su propio perfil; un administrador puede leer los perfiles asociados a un pago pendiente de confirmar. Ver `supabase/schema.sql`.
+- **Sin analítica, sin cookies propias.** La página no carga fuentes ni imágenes de otros dominios; el único recurso externo es el SDK de Supabase (`cdn.jsdelivr.net`), imprescindible para la membresía. Se declara `referrer: no-referrer`.
+- **Las credenciales del navegador no se envían hacia Hacienda:** las peticiones a `api.hacienda.go.cr` usan `credentials: "omit"`. Las peticiones a Supabase sí llevan la cabecera de autorización de su propia sesión — es indispensable para que la membresía funcione, y es tráfico hacia su propio proyecto, no hacia un tercero ajeno.
+- **Prevención de inyección de contenido:** ningún dato recibido de la API ni de Supabase se inserta con `innerHTML`. Todo el contenido dinámico se construye con `document.createElement` y `textContent`.
 - **Prevención de inyección de fórmulas en CSV:** las celdas que comienzan con `=`, `+`, `-` o `@` se prefijan con un apóstrofo para que Excel o LibreOffice no las ejecuten.
 
 Recuerde que las consultas se refieren a información pública, pero el número de identificación introducido es un dato personal. Evite proyectar la pantalla o compartir capturas con datos de terceros sin autorización.
@@ -463,16 +477,21 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
 | Comportamiento (manual modal, acceso admin, paneles, teclado) | 35 | 35 correctos |
 | Calidad: memoria, seguridad y contraste | 14 | 14 correctos |
-| Recorrido exhaustivo (46 pasos, consola limpia) | 46 | 46 correctos |
+| Recorrido exhaustivo (consola limpia) | 49 pasos | correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
+| Membresía (registro, pago, confirmación admin, bloqueo) | 15 | requiere un proyecto Supabase de pruebas — ver sección 14 |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
-| **Total** | **299** | **299 correctos** |
+
+Los bancos que ejercitan la interfaz dentro de `#contenido` (estructura, comportamiento, calidad, recorrido, navegador) simulan una sesión de membresía sin tocar ningún servidor real — ver `pruebas/_membresia-simulada.js` — porque toda la app quedó detrás del login y esos bancos siguen queriendo ser "sin red".
 
 ### Pruebas automáticas en cada publicación
 
-El repositorio incluye un flujo de integración continua (`.github/workflows/pruebas.yml`) que se ejecuta en cada `git push` a `main` y en cada propuesta de cambio. Comprueba la sintaxis del script, que no aparezca ninguna API de inserción de HTML, que no se haya colado ningún recurso externo, y ejecuta los bancos de **lógica**, **estructura** y **comportamiento**.
+El repositorio incluye un flujo de integración continua (`.github/workflows/pruebas.yml`) con dos jobs:
 
-**Los bancos que consultan la API no se ejecutan ahí, y es deliberado.** El motivo no es el tiempo, sino la política de uso del Ministerio: bloquea por dirección IP y advierte expresamente del riesgo de las «arquitecturas en la nube, donde cientos de clientes acceden desde un mismo servidor, concentrando el tráfico en una sola IP». Los runners de GitHub comparten sus direcciones entre miles de proyectos; lanzar consultas desde ahí sería exactamente ese anti-patrón, y un bloqueo perjudicaría a terceros ajenos a este proyecto.
+- **`sin-red`**, en cada `git push` a `main` y en cada propuesta de cambio: comprueba la sintaxis del script, que no aparezca ninguna API de inserción de HTML, que no se haya colado ningún recurso externo fuera de la allowlist, y ejecuta los bancos de **lógica**, **estructura** y **comportamiento** (con la sesión simulada de arriba).
+- **`membresia`**: ejecuta `pruebas-membresia.js` contra un proyecto Supabase dedicado exclusivamente a pruebas, usando tres secretos del repositorio (`SUPABASE_TEST_URL`, `SUPABASE_TEST_ANON_KEY`, `SUPABASE_TEST_SERVICE_ROLE_KEY` — sección 14). Si no están configurados, el banco se omite con un aviso en vez de fallar.
+
+**Los bancos que consultan la API de Hacienda no se ejecutan en CI, y es deliberado.** El motivo no es el tiempo, sino la política de uso del Ministerio: bloquea por dirección IP y advierte expresamente del riesgo de las «arquitecturas en la nube, donde cientos de clientes acceden desde un mismo servidor, concentrando el tráfico en una sola IP». Los runners de GitHub comparten sus direcciones entre miles de proyectos; lanzar consultas desde ahí sería exactamente ese anti-patrón, y un bloqueo perjudicaría a terceros ajenos a este proyecto. Supabase no tiene esa política, por eso su banco sí corre en CI.
 
 Por eso la regla es: **antes de publicar, ejecute la suite completa en su equipo**, que sale con su propia dirección IP.
 
@@ -612,6 +631,48 @@ Además, cuando la consulta no devuelve datos, la aplicación ofrece un **enlace
 **7. Disponibilidad.** La aplicación depende por completo de los servicios del Ministerio de Hacienda. Ni su disponibilidad, ni su exactitud, ni su continuidad están bajo control de esta herramienta.
 
 **8. Carácter informativo.** Los resultados no sustituyen una certificación oficial. Para trámites formales, verifique siempre en los portales del Ministerio de Hacienda (ATV, EDDI, Exonet).
+
+---
+
+## 14. Membresía mensual (Supabase)
+
+Toda la aplicación queda detrás de un inicio de sesión. Esta sección explica cómo ponerla en marcha y cómo funciona por dentro.
+
+### 14.1 Puesta en marcha
+
+1. Cree una cuenta y un proyecto gratuito en [supabase.com](https://supabase.com).
+2. En el **SQL Editor** del proyecto, ejecute el contenido de [`supabase/schema.sql`](supabase/schema.sql) una sola vez. Crea las tablas `profiles` y `payments`, el disparador que da de alta el perfil al registrarse, la función `confirm_payment()` y las políticas de Row Level Security.
+3. Confirme que **Authentication → Providers → Email → "Confirm email"** está activo (lo está por defecto): sin eso, cualquiera podría registrarse con un correo ajeno.
+4. En `index.html`, busque las constantes `SUPABASE_URL` y `SUPABASE_ANON_KEY` (§ 4) y reemplace los dos marcadores `"PENDIENTE_SUPABASE_URL"` / `"PENDIENTE_SUPABASE_ANON_KEY"` por los de su proyecto (**Project Settings → API**). Mientras sigan como marcadores, la aplicación se degrada a un aviso claro en la pantalla de ingreso en vez de romperse — no publique así, pero tampoco es un archivo inservible mientras lo configura.
+5. Regístrese normalmente desde la propia aplicación y, en el SQL Editor, asígnese el rol de administrador:
+   ```sql
+   update public.profiles set role = 'admin' where id =
+     (select id from auth.users where email = 'su-correo@ejemplo.com');
+   ```
+
+### 14.2 El "anon key" es público a propósito
+
+Al igual que la contraseña de reparto de la sección 12, el `anon key` de Supabase **no es un secreto** que deba ocultarse: es la llave con la que el navegador de cualquier visitante habla con su proyecto, y está pensada para viajar dentro del propio código del cliente. La protección real de los datos son las políticas de **Row Level Security** en `supabase/schema.sql`: cada persona sólo puede leer su propio perfil, insertar sus propios pagos y nunca puede asignarse a sí misma el rol de administrador (el permiso de `UPDATE` sobre esa columna está revocado para el rol `authenticated`). Lo único que sí debe permanecer secreto es la **service role key** de su proyecto, que nunca se usa dentro de `index.html` — sólo la necesita, del lado del servidor, el banco de pruebas `pruebas-membresia.js`.
+
+### 14.3 Contraseña admin y panel de membresías comparten un solo interruptor
+
+La contraseña admin pública de la sección 12 ahora revela dos cosas: la configuración avanzada de siempre, y el nuevo **panel de administración de membresías** (cola de pagos pendientes, documento a emitir por cada uno). Es una unificación deliberada: no se creó un segundo sistema de acceso para no duplicar la experiencia de quien administra el sitio. La seguridad real no depende de esa contraseña — los botones «Confirmar»/«Rechazar» llaman a `confirm_payment()`, que sólo tiene efecto si la sesión de Supabase activa en ese momento tiene `role = 'admin'` en la base de datos; conocer la contraseña pública sin esa sesión no permite alterar ningún pago.
+
+### 14.4 Proyecto de pruebas (para `pruebas-membresia.js` y CI)
+
+El banco `pruebas-membresia.js` ejercita el flujo completo (registro → confirmación de correo → bloqueo sin pago → envío de referencia → confirmación por un administrador → acceso reactivado) contra un proyecto Supabase **real, pero dedicado exclusivamente a pruebas** — nunca el de producción. Cree un segundo proyecto igual que el de producción (mismo `supabase/schema.sql`) y exporte, antes de correr `npm test` o `npm run test:membresia`:
+
+```bash
+export SUPABASE_TEST_URL="https://xxxxxxxx.supabase.co"
+export SUPABASE_TEST_ANON_KEY="..."
+export SUPABASE_TEST_SERVICE_ROLE_KEY="..."   # sólo se usa en Node, nunca llega al navegador
+```
+
+Para que también corra en integración continua, cargue esas mismas tres variables como secretos del repositorio (**Settings → Secrets and variables → Actions**) con los nombres `SUPABASE_TEST_URL`, `SUPABASE_TEST_ANON_KEY` y `SUPABASE_TEST_SERVICE_ROLE_KEY`. El job `membresia` de `.github/workflows/pruebas.yml` los usa automáticamente; si faltan, ese banco se omite con un aviso en vez de fallar la build.
+
+### 14.5 Especificación funcional completa
+
+El flujo de usuario, los campos, las reglas de negocio, los estados de la membresía y los criterios de aceptación se documentaron por separado, con sus supuestos explícitos, antes de implementarse. Esta sección cubre la puesta en marcha técnica; para el porqué de cada decisión de producto, consulte esa especificación.
 
 ---
 

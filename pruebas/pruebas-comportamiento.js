@@ -4,7 +4,8 @@
  */
 const { chromium } = require("playwright");
 const path = require("node:path");
-const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).href;
+const { cargarConSesionSimulada } = require("./_membresia-simulada.js");
+const RUTA_INDEX = path.resolve(process.argv[2]);
 
 /* Contraseña administrativa con la que se publica la aplicación. Si usted la
    cambia siguiendo el README, exporte ADMIN_PASSWORD antes de ejecutar el
@@ -29,7 +30,10 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   const b = await abrirNavegador();
   const p = await (await b.newContext({ viewport: { width: 1280, height: 900 }, locale: "es-CR" })).newPage();
-  await p.goto(APP, { waitUntil: "load" });
+  // Este banco es "sin red": la app ahora vive detrás de la membresía, así
+  // que se simula una sesión con plan vigente (sin tocar Supabase real)
+  // para poder seguir auditando manual/admin/paneles como siempre.
+  await cargarConSesionSimulada(p, RUTA_INDEX, { role: "admin" });
   await esperar(500);
 
   console.log("\nAUDITORÍA DE COMPORTAMIENTO\n" + "=".repeat(96));
