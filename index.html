@@ -398,6 +398,10 @@ body:has(.manual-dialog[open],.admin-dialog[open]){ overflow:hidden; }
   border-color:var(--accent); box-shadow:var(--shadow-1);
 }
 .tab__ico{ font-size:1.05rem; line-height:1; }
+.tab--link{
+  text-decoration:none; border-style:dashed; border-color:var(--border);
+}
+.tab--link::after{ content:"↗"; font-size:.8rem; opacity:.7; }
 
 /* --- 1.5 Contenedor principal y tarjetas -------------------------------- */
 main{ max-width:var(--maxw); margin:0 auto; padding:var(--space-5) var(--space-4) var(--space-6); }
@@ -881,13 +885,6 @@ details.raw-wrap > summary{
         <span aria-hidden="true">✅</span>
         <span>Verificar comprobante</span>
       </a>
-      <a class="tool-btn" id="btn-pymes"
-         href="https://www.meic.go.cr/tramites-y-servicios/pymes-activas/"
-         target="_blank" rel="noopener noreferrer"
-         aria-label="Buscar PYMES activas en el sitio oficial del Ministerio de Economía, Industria y Comercio (abre en una pestaña nueva)">
-        <span aria-hidden="true">🏢</span>
-        <span>PYMES</span>
-      </a>
       <button type="button" class="tool-btn" id="btn-theme" aria-live="polite">
         <span aria-hidden="true" id="theme-ico">🌓</span>
         <span id="theme-label">Tema automático</span>
@@ -931,6 +928,12 @@ details.raw-wrap > summary{
     <button class="tab" role="tab" id="tab-cbtbif" aria-controls="panel-cbtbif" aria-selected="false" tabindex="-1">
       <span class="tab__ico" aria-hidden="true">🧺</span> Reglamento de CBTBIF
     </button>
+    <a class="tab tab--link" id="tab-pymes"
+       href="https://www.meic.go.cr/tramites-y-servicios/pymes-activas/"
+       target="_blank" rel="noopener noreferrer"
+       aria-label="Buscar PYMES activas en el sitio oficial del Ministerio de Economía, Industria y Comercio (abre en una pestaña nueva)">
+      <span class="tab__ico" aria-hidden="true">🏢</span> PYMES
+    </a>
   </div>
 </nav>
 
@@ -1001,6 +1004,9 @@ details.raw-wrap > summary{
 
       <h4>Reglamento de CBTBIF</h4>
       <p>Escriba una palabra clave para buscar entre los bienes de la Canasta Básica Tributaria por el Bienestar Integral de las Familias (Decreto 43790-H-MEIC-S), o filtre primero por categoría. Todos los resultados llevan la tarifa reducida del 1&nbsp;% de IVA. El botón "Reglamento de CBTBIF" abre la norma completa en SINALEVI.</p>
+
+      <h4>PYMES</h4>
+      <p>A diferencia de los demás módulos, «PYMES» no abre un panel de consulta dentro de la aplicación: es un acceso directo (marcado con ↗) al buscador oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), que se abre en una pestaña nueva. Ahí puede escribir el nombre o la cédula de una empresa para verificar si conserva la condición PYME vigente, sobre un registro de más de 41&nbsp;000 empresas actualizado a diario.</p>
     </section>
 
     <section class="manual__section" id="manual-resultados">
@@ -1019,7 +1025,6 @@ details.raw-wrap > summary{
       <h3>4. Herramientas del encabezado</h3>
       <ul>
         <li><strong>Verificar comprobante:</strong> abre el verificador oficial de comprobantes electrónicos de Hacienda en una pestaña nueva.</li>
-        <li><strong>PYMES:</strong> abre en una pestaña nueva el buscador oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), con más de 41&nbsp;000 registros actualizados a diario. Úselo para verificar si una empresa tiene la condición PYME vigente.</li>
         <li><strong>Asistente virtual:</strong> abre en una pestaña nueva el asistente de ACC Contadores, para consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica. Úselo cuando el resultado de una consulta requiera interpretación o cuando necesite acompañamiento profesional para el trámite.</li>
         <li><strong>Tema automático:</strong> alterna entre apariencia automática, clara y oscura.</li>
         <li><strong>Limpiar caché:</strong> elimina de la memoria del navegador los resultados temporales de esta sesión.</li>

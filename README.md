@@ -116,17 +116,18 @@ A diferencia de los módulos anteriores, este no consulta ninguna API: busca sob
 
 Igual que el módulo anterior, no consulta ninguna API: busca sobre una lista de 236 bienes transcrita del artículo 5 del texto vigente del Decreto Ejecutivo N.º 43790-H-MEIC-S, que reglamenta la lista de bienes de la Canasta Básica Tributaria por el Bienestar Integral de las Familias (CBTBIF) creada por la Ley N.º 9914, agrupados en sus 20 categorías oficiales (panes y cereales, lácteos, carnes, aceites, frutas y vegetales, artículos de higiene y limpieza del hogar, entre otras), embebida en el propio `index.html`. Funciona sin conexión. El botón «Ver texto oficial y conceptos» abre el texto completo de la norma en SINALEVI en una pestaña nueva, con la misma naturaleza de enlace de navegación deliberado que el del Módulo 7.
 
+### PYMES · acceso directo al buscador oficial (sin panel propio)
+
+Al final de la barra de pestañas, marcado con ↗ y borde discontinuo para distinguirlo de un módulo real, hay un enlace «PYMES» que no abre un panel de consulta: lleva directamente al buscador oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), en `meic.go.cr/tramites-y-servicios/pymes-activas/`. Ese buscador vive fuera de esta aplicación a propósito. El listado completo que publica el MEIC pesa más de 10 MB, tiene más de 41 000 registros y se genera a diario; ni el archivo descargable ni la tabla que lo sirve envían cabeceras CORS, así que un `fetch()` desde `github.io` no podría leer la respuesta. Incrustar una copia local implicaría además una fotografía de un mes concreto que quedaría desactualizada dentro de la propia aplicación. Enlazar al buscador oficial de MEIC evita ambos problemas y entrega siempre la condición PYME vigente el día de la consulta.
+
 ### Accesos externos de la cabecera
 
-Además de los ocho módulos de consulta, la barra de herramientas ofrece tres accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+Además de los ocho módulos de consulta y del enlace «PYMES», la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
 
 | Botón | Destino | Para qué sirve |
 |---|---|---|
 | ✅ Verificar comprobante | `ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/` | Verificador oficial de comprobantes electrónicos del Ministerio de Hacienda |
-| 🏢 PYMES | `meic.go.cr/tramites-y-servicios/pymes-activas/` | Buscador oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), con más de 41 000 registros actualizados a diario |
 | 💬 Asistente virtual | `josancajimenez-debug.github.io/acc-asistente/` | Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica |
-
-El buscador de PYMES no se incrusta en `index.html` a propósito: el listado completo pesa más de 10 MB, se genera a diario y ni el archivo descargable ni la tabla que lo sirve envían cabeceras CORS, así que un `fetch()` desde `github.io` no podría leer la respuesta. Enlazar al buscador oficial de MEIC evita ambos problemas y entrega una consulta siempre vigente, en vez de una fotografía mensual que quedaría desactualizada en la propia aplicación.
 
 El Asistente virtual está también accesible desde el pie de página, junto a los datos de contacto, para quien llegue al final de una consulta y necesite acompañamiento profesional para interpretar el resultado.
 
