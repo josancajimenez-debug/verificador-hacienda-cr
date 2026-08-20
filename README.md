@@ -124,15 +124,11 @@ Busca por cédula, nombre o razón social sobre una copia local de 38 106 regist
 
 Los datos se descargaron directamente del CSV oficial que publica el MEIC (mismo dominio que la página de transparencia), no de una conversión de PDF: un primer intento de usar un archivo convertido a Markdown resultó en texto corrupto (nombres y cédulas repetidos sin sentido, típico de una OCR fallida) y se descartó antes de escribir una sola línea de datos en la aplicación — la misma exigencia de "solo datos reales verificables" que rige el resto de la aplicación.
 
-### PYMES · acceso directo a la lista oficial (sin panel propio)
-
-Al final de la barra de pestañas, marcado con ↗ y borde discontinuo para distinguirlo de un módulo real, hay un enlace «PYMES» que no abre un panel de consulta: lleva directamente a la página oficial de transparencia del Ministerio de Economía, Industria y Comercio (MEIC), en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls) con el listado de empresas con condición PYME activa. Es el complemento natural del Módulo 9: ahí se consulta la condición vigente el día de hoy, no la fotografía del 31 de julio de 2026 que vive dentro de la aplicación.
-
-> **Nota.** El MEIC también publica, en `meic.go.cr/tramites-y-servicios/pymes-activas/`, una tabla en vivo (buscable por nombre o cédula, actualizada a diario) con el mismo registro. No es la página enlazada por el botón «PYMES» —se prefirió apuntar a la fuente de transparencia oficial que referencia la bibliografía—, pero es la opción a considerar si en el futuro se prioriza la búsqueda de una empresa puntual sobre la descarga del listado mensual completo.
+Para la condición vigente el día de la consulta (este listado es una fotografía fija del 31 de julio de 2026, no se actualiza sola), el botón "Ver publicación oficial" del propio módulo lleva a la página de transparencia del MEIC, en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls). El MEIC también publica, en `meic.go.cr/tramites-y-servicios/pymes-activas/`, una tabla en vivo (buscable por nombre o cédula, actualizada a diario) con el mismo registro; no es la página enlazada por el módulo —se prefirió apuntar a la fuente de transparencia oficial que referencia la bibliografía—, pero es la opción a considerar si en el futuro se prioriza esa tabla en vivo sobre la descarga del listado mensual completo.
 
 ### Accesos externos de la cabecera
 
-Además de los nueve módulos de consulta y del enlace «PYMES», la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+Además de los nueve módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
 
 | Botón | Destino | Para qué sirve |
 |---|---|---|
