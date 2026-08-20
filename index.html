@@ -989,7 +989,7 @@ details.raw-wrap > summary{
       <p>Elija búsqueda por código o descripción. El código requiere exactamente 13 dígitos; la descripción, al menos tres caracteres. Seleccione el resultado que represente con mayor precisión el bien o servicio y compruebe la tarifa antes de facturar.</p>
 
       <h4>Insumos con tarifa reducida del 1%</h4>
-      <p>Escriba una palabra clave para buscar en los cuatro anexos del Decreto 41824-H-MAG, o filtre primero por anexo. Cada resultado indica a qué persona compradora (productor de Canasta Básica Tributaria, productor agropecuario MAG o pescador/acuicultor INCOPESCA) le corresponde la tarifa del 1&nbsp;%. El botón "Ver texto oficial" abre la norma completa en SINALEVI.</p>
+      <p>Escriba una palabra clave para buscar en los cuatro anexos del Decreto 41824-H-MAG, o filtre primero por anexo. Cada resultado indica a qué persona compradora (productor de Canasta Básica Tributaria, productor agropecuario MAG o pescador/acuicultor INCOPESCA) le corresponde la tarifa del 1&nbsp;%. El botón "Reglamento de insumos agropecuarios y veterinarios" abre la norma completa en SINALEVI.</p>
     </section>
 
     <section class="manual__section" id="manual-resultados">
@@ -1578,8 +1578,8 @@ details.raw-wrap > summary{
           <a class="btn btn--primary"
              href="https://sinalevi.go.cr/ResultadosNormativa/Informacion?param1=89093&amp;param2=117942&amp;param3=1"
              target="_blank" rel="noopener noreferrer"
-             aria-label="Ver el texto oficial completo del Decreto 41824-H-MAG, sus conceptos y anexos en SINALEVI (abre en una pestaña nueva)">
-            <span aria-hidden="true">📖</span> Ver texto oficial y conceptos (SINALEVI)
+             aria-label="Reglamento de insumos agropecuarios y veterinarios: texto oficial completo del Decreto 41824-H-MAG en SINALEVI (abre en una pestaña nueva)">
+            <span aria-hidden="true">📖</span> Reglamento de insumos agropecuarios y veterinarios
           </a>
         </div>
 
@@ -4243,7 +4243,8 @@ const GRUPOS_INSUMOS_41824 = {
  * de pesca no deportiva y conformación del registro de productores
  * agropecuarios), transcritas del texto oficial. Lista estática de
  * referencia: ante cualquier duda o actualización posterior, prevalece el
- * texto vigente en SINALEVI (enlace del botón "Ver texto oficial").
+ * texto vigente en SINALEVI (enlace del botón "Reglamento de insumos
+ * agropecuarios y veterinarios").
  */
 const INSUMOS_DESCRIPCIONES_41824 = {
   'anexo1-agro': [
@@ -4994,7 +4995,7 @@ function initInsumos() {
     "Ante dudas sobre una especificación técnica o una reforma posterior, confirme el texto vigente en la fuente oficial.",
     null,
     { url: "https://sinalevi.go.cr/ResultadosNormativa/Informacion?param1=89093&param2=117942&param3=1",
-      texto: "Ver texto oficial en SINALEVI" });
+      texto: "Reglamento de insumos agropecuarios y veterinarios (SINALEVI)" });
   $("in-insumos-anexo").addEventListener("change", renderInsumos);
   renderInsumos();
 }
