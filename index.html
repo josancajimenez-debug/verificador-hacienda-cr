@@ -923,6 +923,9 @@ details.raw-wrap > summary{
     <button class="tab" role="tab" id="tab-insumos" aria-controls="panel-insumos" aria-selected="false" tabindex="-1">
       <span class="tab__ico" aria-hidden="true">🧾</span> Reglamento de insumos agropecuarios y veterinarios
     </button>
+    <button class="tab" role="tab" id="tab-cbtbif" aria-controls="panel-cbtbif" aria-selected="false" tabindex="-1">
+      <span class="tab__ico" aria-hidden="true">🧺</span> Reglamento de CBTBIF
+    </button>
   </div>
 </nav>
 
@@ -990,6 +993,9 @@ details.raw-wrap > summary{
 
       <h4>Insumos con tarifa reducida del 1%</h4>
       <p>Escriba una palabra clave para buscar en los cuatro anexos del Decreto 41824-H-MAG, o filtre primero por anexo. Cada resultado indica a qué persona compradora (productor de Canasta Básica Tributaria, productor agropecuario MAG o pescador/acuicultor INCOPESCA) le corresponde la tarifa del 1&nbsp;%. El botón "Reglamento de insumos agropecuarios y veterinarios" abre la norma completa en SINALEVI.</p>
+
+      <h4>Reglamento de CBTBIF</h4>
+      <p>Escriba una palabra clave para buscar entre los bienes de la Canasta Básica Tributaria por el Bienestar Integral de las Familias (Decreto 43790-H-MEIC-S), o filtre primero por categoría. Todos los resultados llevan la tarifa reducida del 1&nbsp;% de IVA. El botón "Reglamento de CBTBIF" abre la norma completa en SINALEVI.</p>
     </section>
 
     <section class="manual__section" id="manual-resultados">
@@ -1604,17 +1610,99 @@ details.raw-wrap > summary{
     </div>
   </section>
 
+  <!-- ==== MÓDULO 8: CBTBIF (Decreto 43790-H-MEIC-S) ======================= -->
+  <section class="panel" id="panel-cbtbif" role="tabpanel" aria-labelledby="tab-cbtbif" tabindex="0" hidden>
+    <div class="card">
+      <div class="card__head">
+        <h2 class="card__title"><span aria-hidden="true">🧺</span> Canasta Básica Tributaria por el Bienestar Integral de las Familias (CBTBIF)</h2>
+        <p class="card__desc">
+          Busque bienes incluidos en la Canasta Básica Tributaria por el Bienestar Integral de las Familias,
+          que gozan de la tarifa reducida del 1&nbsp;% del IVA según el Decreto Ejecutivo N.º 43790-H-MEIC-S.
+          Listado local de 236 registros: la búsqueda no requiere conexión a Internet.
+        </p>
+      </div>
+      <div class="card__body">
+        <details class="guide">
+          <summary>Significado, uso, aplicación e importancia</summary>
+          <div class="guide__grid">
+            <section class="guide__item">
+              <h3>Significado</h3>
+              <p>La CBTBIF es la lista de bienes de consumo esencial —alimentos de todos los grupos nutricionales, productos de limpieza, higiene personal y artículos escolares— que goza de la tarifa reducida del 1&nbsp;% del IVA, de conformidad con el subinciso b) del numeral 3 del artículo 11 de la Ley del IVA (Ley 6826) y la Ley 9914.</p>
+            </section>
+            <section class="guide__item">
+              <h3>Uso</h3>
+              <p>Permite verificar si un bien en particular figura en alguna de las veinte categorías del Decreto 43790-H-MEIC-S antes de aplicarle la tarifa reducida del 1&nbsp;% en lugar de la tarifa general del IVA.</p>
+            </section>
+            <section class="guide__item">
+              <h3>Aplicación práctica</h3>
+              <p>Busque el bien por palabra clave, o filtre primero por categoría. La tarifa del 1&nbsp;% aplica sobre estos bienes de mayor consumo en el treinta por ciento (30&nbsp;%) de la población de menores ingresos, según la Encuesta Nacional de Ingresos y Gastos de los Hogares (ENIGH). Los productores agropecuarios inscritos que vendan bienes o servicios directamente relacionados con la CBTBIF también pueden aplicar la tarifa reducida (art. 3).</p>
+            </section>
+            <section class="guide__item">
+              <h3>Importancia</h3>
+              <p>Muchas descripciones excluyen expresamente presentaciones específicas (por ejemplo, cortes de lomo en carnes, o quesos madurados); aplicar la tarifa reducida a una variante excluida genera diferencias de IVA. El listado corresponde a la versión vigente y consolidada del decreto; ante dudas, confirme el texto oficial.</p>
+            </section>
+          </div>
+          <p class="guide__source"><strong>Citas:</strong> (Asamblea Legislativa de la República de Costa Rica, 1982, art. 11.3.b; Asamblea Legislativa de la República de Costa Rica, 2020; Poder Ejecutivo de la República de Costa Rica, 2022, arts. 1-7). <cite>Ley 6826</cite> · <cite>Ley 9914</cite> · <cite>Decreto 43790-H-MEIC-S</cite>.</p>
+        </details>
+
+        <div class="actions actions--sueltas">
+          <a class="btn btn--primary"
+             href="https://sinalevi.go.cr/ResultadosNormativa/Informacion?param1=98204&amp;param2=148980&amp;param3=1"
+             target="_blank" rel="noopener noreferrer"
+             aria-label="Reglamento de CBTBIF: texto oficial completo del Decreto 43790-H-MEIC-S en SINALEVI (abre en una pestaña nueva)">
+            <span aria-hidden="true">📖</span> Reglamento de CBTBIF
+          </a>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="in-cbtbif-categoria">Filtrar por categoría</label>
+            <select class="select" id="in-cbtbif-categoria">
+              <option value="todos" selected>Las 20 categorías (236 registros)</option>
+              <option value="cati">Categoría I · Panes, tortillas, repostería y galletas (15)</option>
+              <option value="catii">Categoría II · Cereales, arroces, harinas y pastas alimenticias (16)</option>
+              <option value="catiii">Categoría III · Quesos y leche (18)</option>
+              <option value="cativ">Categoría IV · Huevos y carne de pollo (10)</option>
+              <option value="catv">Categoría V · Carne de res (7)</option>
+              <option value="catvi">Categoría VI · Carne de cerdo (5)</option>
+              <option value="catvii">Categoría VII · Embutidos (5)</option>
+              <option value="catviii">Categoría VIII · Pescado y atún (19)</option>
+              <option value="catix">Categoría IX · Aceites, margarinas y manteca (7)</option>
+              <option value="catx">Categoría X · Frutas (27)</option>
+              <option value="catxi">Categoría XI · Semillas (4)</option>
+              <option value="catxii">Categoría XII · Vegetales, leguminosas, tubérculos y hortalizas (48)</option>
+              <option value="catxiii">Categoría XIII · Azúcar (3)</option>
+              <option value="catxiv">Categoría XIV · Jaleas y gelatinas (2)</option>
+              <option value="catxv">Categoría XV · Condimentos y similares (8)</option>
+              <option value="catxvi">Categoría XVI · Aderezos y salsas (5)</option>
+              <option value="catxvii">Categoría XVII · Productos para preparar bebidas diversas (6)</option>
+              <option value="catxviii">Categoría XVIII · Artículos para higiene y limpieza personal (8)</option>
+              <option value="catxix">Categoría XIX · Bienes cuidado del hogar (6)</option>
+              <option value="catxx">Categoría XX · Artículos escolares (17)</option>
+            </select>
+            <p class="hint">Elija una categoría y luego escriba una palabra clave en el campo "Filtrar resultados" de la tabla para acotar la búsqueda.</p>
+          </div>
+        </div>
+
+        <div id="alert-cbtbif" role="status" aria-live="polite"></div>
+        <div class="result" id="out-cbtbif" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
   <details class="references card">
     <summary>Referencias bibliográficas (APA 7.ª ed.)</summary>
     <div class="references__body">
       <p>Asamblea Legislativa de la República de Costa Rica. (1971). <cite>Código de Normas y Procedimientos Tributarios</cite> (Ley N.º 4755).</p>
       <p>Asamblea Legislativa de la República de Costa Rica. (1982). <cite>Ley del Impuesto sobre el Valor Agregado</cite> (Ley N.º 6826, texto vigente).</p>
       <p>Asamblea Legislativa de la República de Costa Rica. (1988). <cite>Ley del Impuesto sobre la Renta</cite> (Ley N.º 7092, texto vigente).</p>
+      <p>Asamblea Legislativa de la República de Costa Rica. (2020). <cite>Definición de la Canasta Básica por el Bienestar Integral de las Familias</cite> (Ley N.º 9914).</p>
       <p>Dirección General de Tributación. (2024a). <cite>Anexos y estructuras para la emisión de comprobantes electrónicos: Versión 4.4</cite>. Ministerio de Hacienda de Costa Rica.</p>
       <p>Dirección General de Tributación. (2024b). <cite>Resolución general sobre las disposiciones técnicas de los comprobantes electrónicos para efectos tributarios</cite> (Resolución N.º MH-DGT-RES-0027-2024). Ministerio de Hacienda de Costa Rica.</p>
       <p>Poder Ejecutivo de la República de Costa Rica. (2014). <cite>Reglamento de Procedimiento Tributario</cite> (Decreto Ejecutivo N.º 38277-H).</p>
       <p>Poder Ejecutivo de la República de Costa Rica. (2019). <cite>Reglamento de la Ley del Impuesto sobre el Valor Agregado</cite> (Decreto Ejecutivo N.º 41779-H).</p>
       <p>Poder Ejecutivo de la República de Costa Rica. (2019). <cite>Reglamento de insumos agropecuarios y veterinarios, insumos de pesca no deportiva y conformación del registro de productores agropecuarios</cite> (Decreto Ejecutivo N.º 41824-H-MAG).</p>
+      <p>Poder Ejecutivo de la República de Costa Rica. (2022). <cite>Reglamentación de lista de bienes que conforman la Canasta Básica Tributaria por el Bienestar Integral de las Familias (CBTBIF)</cite> (Decreto Ejecutivo N.º 43790-H-MEIC-S).</p>
       <p>Poder Ejecutivo de la República de Costa Rica. (2024). <cite>Reglamento de comprobantes electrónicos para efectos tributarios</cite> (Decreto Ejecutivo N.º 44739-H).</p>
       <p class="references__note"><strong>Nota:</strong> Las explicaciones son informativas y sintetizan las normas citadas. Ante reformas, casos especiales o discrepancias, prevalece el texto oficial vigente.</p>
     </div>
@@ -5002,6 +5090,364 @@ function initInsumos() {
 
 
 /* ========================================================================= */
+/* == § 15C · MÓDULO 8 — CBTBIF (Decreto 43790-H-MEIC-S) =================== */
+/* ========================================================================= */
+/*
+ * Búsqueda local (sin llamadas a red) sobre los bienes que conforman la
+ * Canasta Básica Tributaria por el Bienestar Integral de las Familias
+ * (CBTBIF), todos con tarifa del 1 % del IVA. El texto oficial completo,
+ * con sus definiciones y categorías, se consulta en SINALEVI mediante el
+ * botón de la pestaña.
+ */
+
+const GRUPOS_CBTBIF_43790 = {
+  'cati': { categoriaLabel: "Categoría I", categoria: "Panes, tortillas, repostería y galletas" },
+  'catii': { categoriaLabel: "Categoría II", categoria: "Cereales, arroces, harinas y pastas alimenticias" },
+  'catiii': { categoriaLabel: "Categoría III", categoria: "Quesos y leche" },
+  'cativ': { categoriaLabel: "Categoría IV", categoria: "Huevos y carne de pollo" },
+  'catv': { categoriaLabel: "Categoría V", categoria: "Carne de res" },
+  'catvi': { categoriaLabel: "Categoría VI", categoria: "Carne de cerdo" },
+  'catvii': { categoriaLabel: "Categoría VII", categoria: "Embutidos" },
+  'catviii': { categoriaLabel: "Categoría VIII", categoria: "Pescado y atún" },
+  'catix': { categoriaLabel: "Categoría IX", categoria: "Aceites, margarinas y manteca" },
+  'catx': { categoriaLabel: "Categoría X", categoria: "Frutas" },
+  'catxi': { categoriaLabel: "Categoría XI", categoria: "Semillas" },
+  'catxii': { categoriaLabel: "Categoría XII", categoria: "Vegetales, leguminosas, tubérculos y hortalizas" },
+  'catxiii': { categoriaLabel: "Categoría XIII", categoria: "Azúcar" },
+  'catxiv': { categoriaLabel: "Categoría XIV", categoria: "Jaleas y gelatinas" },
+  'catxv': { categoriaLabel: "Categoría XV", categoria: "Condimentos y similares" },
+  'catxvi': { categoriaLabel: "Categoría XVI", categoria: "Aderezos y salsas" },
+  'catxvii': { categoriaLabel: "Categoría XVII", categoria: "Productos para preparar bebidas diversas" },
+  'catxviii': { categoriaLabel: "Categoría XVIII", categoria: "Artículos para higiene y limpieza personal" },
+  'catxix': { categoriaLabel: "Categoría XIX", categoria: "Bienes cuidado del hogar" },
+  'catxx': { categoriaLabel: "Categoría XX", categoria: "Artículos escolares" }
+};
+
+/**
+ * Bienes que conforman la Canasta Básica Tributaria por el Bienestar
+ * Integral de las Familias (CBTBIF), transcritos del artículo 5 del texto
+ * oficial vigente del Decreto Ejecutivo N.º 43790-H-MEIC-S (consolidado con
+ * sus reformas). Cuando un bien pertenece a un subgrupo del propio texto
+ * (p. ej. "Leche líquida"), el subgrupo se antepone con una raya.
+ */
+const CBTBIF_DESCRIPCIONES_43790 = {
+  'cati': [
+    "Barra de pan o melcochón o pan italiano",
+    "Barra de pan o melcochón, con queso, ajonjolí",
+    "Bizcochos, rosquillas, mantecados, palitos salados de harina o queso",
+    "Bollo de pan dulce",
+    "Bonete de pan dulce o pan casero",
+    "Galletas dulces simples sin relleno",
+    "Galletas saladas (no incluye las galletas de arroz, avena, integrales, extra fibra y rellenas)",
+    "Pan blanco, manita o piña, pan francés",
+    "Pan cuadrado blanco",
+    "Pan cuadrado integral",
+    "Pan integral de panadería",
+    "Pan pita o árabe",
+    "Pan salado sin gluten",
+    "Tortilla de harina integral",
+    "Tortilla de maíz, excepto las tostadas de maíz condimentadas"
+  ],
+  'catii': [
+    "Afrecho o salvado",
+    "Almidón de yuca",
+    "Arroz grano entero (Según norma oficial para el arroz contenida en el Decreto Ejecutivo N°26901-MEIC o el que se encuentre vigente. No incluye arroz con procesos agregados, arroz con ingredientes adicionales, arroz tipo jazmín, basmati, negro, silvestre, arbóreo o similares)",
+    "Arroz integral",
+    "Arroz precocido",
+    "Avena hojuela",
+    "Avena integral",
+    "Cereal en hojuelas de maíz simple",
+    "Fécula de maíz",
+    "Granola (con frutos secos y avena, sin azúcar añadida)",
+    "Harina de maíz (masa) y masa preparada para chorreadas",
+    "Harina de trigo",
+    "Harina integral",
+    "Levadura",
+    "Pastas alimenticias independientemente de su forma y presentación, como son, tipo caracolitos, cabello de ángel, lengua, canelones, chop suey, espaguetis, lasaña, (no incluyen las pastas con relleno, preparadas o las que contienen otros aditamentos)",
+    "Pasta de arroz"
+  ],
+  'catiii': [
+    "Cuajada, natilla y queso de leche de vaca — Cuajada",
+    "Cuajada, natilla y queso de leche de vaca — Natilla, excepto la natilla light o ligera",
+    "Cuajada, natilla y queso de leche de vaca — Queso duro o semiduro. (Según Reglamento Técnico Centroamericano RTCA 67.4. 70:14 Productos Lácteos. Quesos. Especificaciones Decreto Ejecutivo Nº 39678-COMEX-MEIC-MAG-S). Se exceptúa el queso parmesano",
+    "Cuajada, natilla y queso de leche de vaca — Queso rallado o molido. (No incluye queso tipo mozzarella, quesos maduros, por ejemplo, el parmesano, ni sus combinaciones)",
+    "Cuajada, natilla y queso de leche de vaca — Queso no madurado, incluido el queso fresco (Según Reglamento Técnico Centroamericano RTCA 67.4.70:14 Productos Lácteos. Quesos. Especificaciones. Decreto Ejecutivo Nº 39678-COMEX-MEIC-MAG-S). No incluye quesos frescos como mozzarella, cottage y parmesano",
+    "Leche líquida, en las siguientes presentaciones — Descremada",
+    "Leche líquida, en las siguientes presentaciones — Deslactosada",
+    "Leche líquida, en las siguientes presentaciones — Entera",
+    "Leche líquida, en las siguientes presentaciones — Fortificada",
+    "Leche líquida, en las siguientes presentaciones — Fresca",
+    "Leche líquida, en las siguientes presentaciones — Semidescremada",
+    "Leche en polvo, en las siguientes presentaciones — Descremada",
+    "Leche en polvo, en las siguientes presentaciones — Deslactosada",
+    "Leche en polvo, en las siguientes presentaciones — Entera",
+    "Leche en polvo, en las siguientes presentaciones — Fortificada",
+    "Leche en polvo, en las siguientes presentaciones — Semidescremada",
+    "Otras leches — Leche de cabra (fluida)",
+    "Otras leches — Leche Fórmula maternizada en polvo en cualquier presentación para lactantes, según el código de la ENIGH. No(*) se incluye formulas nutritivas o suplementos."
+  ],
+  'cativ': [
+    "Alas de pollo",
+    "Gallina entera o gallo entero",
+    "Huevos de gallina (blancos o rojos)",
+    "Menudos o vísceras de pollo",
+    "Muslito de ala de pollo",
+    "Pechuga de pollo con piel y hueso",
+    "Pierna o Muslo (cuarto) de pollo con piel",
+    "Pierna o Muslo (cuarto) de pollo deshuesado",
+    "Pollo entero",
+    "Trocitos de pollo"
+  ],
+  'catv': [
+    "Bistec o carne de res",
+    "Carne molida de res",
+    "Costilla de res",
+    "Hígado de res",
+    "Jarrete, hueso de pescuezo, osobuco, posta con hueso",
+    "Posta o trocitos de res",
+    "Vísceras de res (bofe, corazón, morcilla, riñones)"
+  ],
+  'catvi': [
+    "Bistec, posta de cerdo o trocitos de cerdo",
+    "Chuleta de cerdo",
+    "Costilla de cerdo",
+    "Pezuña de cerdo, rabo, cabeza y orejas",
+    "Vísceras de cerdo (sesos, hígado, corazón)"
+  ],
+  'catvii': [
+    "Chorizo de res, cerdo y sus mezclas",
+    "Mortadela con res, cerdo y ave (gallina gallo, pollo, pavo) y sus mezclas",
+    "Salchicha con res, cerdo y ave (gallina gallo, pollo, pavo) y sus mezclas",
+    "Salchichón con res, cerdo y ave (gallina gallo, pollo, pavo) y sus mezclas",
+    "Otros — Pate de cerdo o res"
+  ],
+  'catviii': [
+    "Pescado — Cabezas de pescado (recortes)",
+    "Pescado — Filete de pescado pangasius",
+    "Pescado — Filete de pescado roncador",
+    "Pescado — Filete o pancitas de tilapia",
+    "Pescado — Pescado entero atún aleta amarilla segunda",
+    "Pescado — Pescado entero bagre",
+    "Pescado — Pescado entero berrugate",
+    "Pescado — Pescado entero bonito",
+    "Pescado — Pescado entero cabrilla",
+    "Pescado — Pescado entero candado (barracuda)",
+    "Pescado — Pescado entero chatarra (pescado entero de menos de 200 gramos de peso total)",
+    "Pescado — Pescado entero jurel",
+    "Pescado — Pescado entero lisa",
+    "Pescado — Pescado entero macarela",
+    "Pescado — Pescado entero sardina",
+    "Pescado — Pescado entero tilapia",
+    "Atún enlatado con los aceites señalados en el inciso IX de esta lista — Atún con vegetales",
+    "Atún enlatado con los aceites señalados en el inciso IX de esta lista — Atún en aceite",
+    "Sardinas en salsa — Sardinas en salsa de tomate o escabeche, enlatadas"
+  ],
+  'catix': [
+    "Aceite de canola, incluso en aerosol",
+    "Aceite de coco",
+    "Aceite de girasol, incluso en aerosol",
+    "Aceite de palma africana, incluso en aerosol",
+    "Aceite de soya, incluso en aerosol",
+    "Manteca vegetal",
+    "Margarina"
+  ],
+  'catx': [
+    "Aguacate",
+    "Banano maduro",
+    "Banano verde",
+    "Cacao en fruto",
+    "Caimito",
+    "Carambola",
+    "Coco seco",
+    "Cuadrado maduro",
+    "Cuadrado verde",
+    "Guaba",
+    "Guineo verde",
+    "Limón acido",
+    "Manga madura y verde",
+    "Mango maduro y verde",
+    "Manzana de agua",
+    "Manzana",
+    "Marañón",
+    "Melón",
+    "Nance",
+    "Naranjilla",
+    "Papaya",
+    "Pejibaye",
+    "Piña",
+    "Plátano maduro",
+    "Plátano verde",
+    "Sandia",
+    "Tamarindo"
+  ],
+  'catxi': [
+    "Ajonjolí",
+    "Chan",
+    "Linaza",
+    "Maní tostado, simple con y sin cáscara (Sin sal)"
+  ],
+  'catxii': [
+    "Ajo",
+    "Apio fresco",
+    "Ayote sazón y calabaza",
+    "Ayote tierno",
+    "Camote",
+    "Cebolla",
+    "Cebollín",
+    "Chayote sazón",
+    "Chayotes",
+    "Chile dulce o pimiento",
+    "Chile Panameño",
+    "Chile picante o jalapeño",
+    "Cubaces",
+    "Culantro castilla",
+    "Culantro coyote",
+    "Elote blanco y amarillo",
+    "Flor de itabo",
+    "Frijoles blancos, incluso secos",
+    "Frijoles negros, incluso secos",
+    "Frijoles rojos, incluso secos",
+    "Frijoles tiernos o nacidos",
+    "Garbanzos, incluso secos",
+    "Hierba buena",
+    "Lechuga criolla",
+    "Lentejas, incluso secos",
+    "Maíz Cascado",
+    "Maíz desgranado",
+    "Malanga",
+    "Manzanilla fresca",
+    "Mostaza en hojas",
+    "Ñame",
+    "Ñampí",
+    "Orégano fresco",
+    "Papa",
+    "Pepino",
+    "Perejil fresco",
+    "Pipián",
+    "Rábano largo",
+    "Rábano redondo",
+    "Remolacha",
+    "Repollo verde",
+    "Tacaco",
+    "Tiquizque",
+    "Tomate",
+    "Tomillo fresco",
+    "Vainica",
+    "Yuca",
+    "Zanahoria"
+  ],
+  'catxiii': [
+    "Azúcar blanco sin refinar y azúcar refinada (Según Decreto Ejecutivo N° 17584-MEIC y sus reformas, Norma Oficial para Azúcar)",
+    "Miel de abeja",
+    "Tapa de dulce en polvo, sólida y compacta. (Se exceptúa en cualquier otra presentación)"
+  ],
+  'catxiv': [
+    "Gelatina en polvo",
+    "Jalea o mermelada de frutas"
+  ],
+  'catxv': [
+    "Achiote (en pasta)",
+    "Bicarbonato de sodio",
+    "Canela",
+    "Clavo de olor",
+    "Comino",
+    "Jengibre",
+    "Pimenta negra (entera y en polvo)",
+    "Sal molida y refinada. (Según Norma Oficial para la sal de calidad alimentaria, contenida en el Decreto Ejecutivo N º 18959-MEIC-S, sus reformas o los que estén vigentes)"
+  ],
+  'catxvi': [
+    "Mayonesa. (Según Reglamento Técnico. Salsas y productos similares. Mayonesa. Especificaciones Vigente)",
+    "Mostaza preparada",
+    "Pasta de tomate",
+    "Salsa de tomate (tipo kétchup)",
+    "Salsa tipo inglesa, salsa de vegetales"
+  ],
+  'catxvii': [
+    "Avena",
+    "Café molido (excepto en grano, descafeinado y soluble)",
+    "Cocoa",
+    "Horchata o pinolillo",
+    "Leche de soja en polvo",
+    "Té de hierbas, de frutas y té negro, en bolsitas"
+  ],
+  'catxviii': [
+    "Cepillo de dientes",
+    "Hilo dental",
+    "Pañal desechable",
+    "Papel higiénico",
+    "Pasta de dientes",
+    "Talco",
+    "Toallas sanitarias, tampones y protectores diarios",
+    "Toallitas húmedas para higiene y limpieza personal. (No incluye las desmaquillantes, ni las desinfectantes)"
+  ],
+  'catxix': [
+    "Bolsas plásticas para basura",
+    "Bombillo eléctrico corriente (Filamento)",
+    "Escoba",
+    "Fósforos",
+    "Pala para basura",
+    "Palo o gancho para limpiar pisos"
+  ],
+  'catxx': [
+    "Bolígrafo desechable (aquel que no se le puede remover o cambiar el depósito de tinta)",
+    "Borrador o goma para borrar, de caucho o material plástico",
+    "Calzado escolar, cuyo precio máximo al consumidor no sobrepase la suma de quince mil noventa y cuatro colones exactos (¢15.094,00)(*). Las características del calzado escolar serán definidas con base en los lineamientos emitidos por el Ministerio de Educación Pública y el precio máximo al consumidor, será actualizado por la Dirección General de Hacienda, de conformidad con la variación del Índice de Precios al Consumidor (IPC) que determina el Instituto Nacional de Estadística y Censos (INEC). Dicha actualización se realizará y publicará anualmente mediante resolución de la Dirección General de Hacienda y regirá a partir del primero de enero de cada año, para lo cual se considerará la variación anual del Índice de Precios al Consumidor al mes de octubre. La primera actualización regirá a partir del 01 de enero de 2024, considerando la variación anual del IPC entre los meses de octubre 2022 y octubre 2023",
+    "Compas (con o sin lápiz), reglas planas, transportadores, escuadras; todos inferiores o igual a 30 centímetros; juegos de geometría que incluyan alguno o todos los artículos indicados anteriormente en este ítem",
+    "Crayones",
+    "Cuaderno (cualquier tipo)",
+    "Goma cola o pegamentos de toda clase para uso escolar, en envases de contenido neto menor de 250 ce, excepto los preparados a base de caucho",
+    "Hojas blancas, rayadas y de colores",
+    "Lápices de color",
+    "Lápices de mina negra con funda de madera para uso escolar (inciso arancelario 960910)",
+    "Pastas para modelar (plastilina o plasticina)",
+    "Pinturas de colores, tipo témperas, incluso con sus accesorios",
+    "Salveque (bulto) de tela o nylon",
+    "Tajador o sacapuntas manual de bolsillo",
+    "Tijera punta roma",
+    "Tiza en barritas",
+    "Uniforme Prescolar, Escolar o Colegial. (Según Decreto Ejecutivo Nº28557 denominado Reglamento Uniforme Oficial en las Instituciones Educativas Públicas o el que se encuentre vigente.)"
+  ]
+};
+
+const CBTBIF_BIENES_43790 = Object.entries(CBTBIF_DESCRIPCIONES_43790).flatMap(([grupoId, lista]) =>
+  lista.map((descripcion, i) => ({ grupoId, num: i + 1, descripcion, ...GRUPOS_CBTBIF_43790[grupoId] }))
+);
+
+function renderCbtbif() {
+  const categoria = $("in-cbtbif-categoria").value;
+  const filas = categoria === "todos"
+    ? CBTBIF_BIENES_43790
+    : CBTBIF_BIENES_43790.filter((r) => r.grupoId === categoria);
+
+  clearNode($("out-cbtbif"));
+
+  const tabla = new DataTable({
+    columns: [
+      { key: "categoriaLabel", label: "Categoría" },
+      { key: "categoria", label: "Grupo" },
+      { key: "descripcion", label: "Bien" }
+    ],
+    rows: filas,
+    pageSize: 20,
+    csvName: "cbtbif_tarifa_reducida_43790",
+    emptyText: "Ningún bien coincide con el filtro escrito."
+  });
+  $("out-cbtbif").appendChild(tabla.root);
+}
+
+function initCbtbif() {
+  showAlert("alert-cbtbif", "info", "Listado de referencia",
+    "Estos 236 registros se transcribieron del artículo 5 del texto vigente del Decreto Ejecutivo N.º 43790-H-MEIC-S. " +
+    "Ante dudas sobre una especificación técnica o una reforma posterior, confirme el texto vigente en la fuente oficial.",
+    null,
+    { url: "https://sinalevi.go.cr/ResultadosNormativa/Informacion?param1=98204&param2=148980&param3=1",
+      texto: "Reglamento de CBTBIF (SINALEVI)" });
+  $("in-cbtbif-categoria").addEventListener("change", renderCbtbif);
+  renderCbtbif();
+}
+
+
+/* ========================================================================= */
 /* == § 16 · ARRANQUE ====================================================== */
 /* ========================================================================= */
 
@@ -5022,6 +5468,7 @@ function init() {
   initPesca();
   initCabys();
   initInsumos();
+  initCbtbif();
 
   updateCacheCount();
 
