@@ -510,7 +510,7 @@ node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
 
 **Cambiar la duración predeterminada de la caché.** Utilice el selector de Configuración avanzada o, para cambiar el valor de fábrica, modifique `TTL_PREDETERMINADO` (§ 4). Si añade una duración nueva, agréguela **a la vez** a `TTL_ADMITIDOS` y a las opciones del `<select id="cfg-ttl">`: esa constante es la lista blanca con la que se validan las preferencias leídas de `localStorage`, y una duración que no figure en ella se sustituye por la predeterminada.
 
-**Acceso a la configuración avanzada.** La contraseña de reparto es `Admin-ACC-2026!`. El navegador la verifica mediante PBKDF2-SHA-256 (210 000 iteraciones); sólo la sal y el hash están en `ADMIN_AUTH`, la contraseña nunca se guarda en texto legible, y el desbloqueo vive en `sessionStorage` hasta cerrar la pestaña o pulsar «Cerrar admin».
+**Acceso a la configuración avanzada.** La contraseña de reparto es `Hacienda-CR-1262!`. El navegador la verifica mediante PBKDF2-SHA-256 (210 000 iteraciones); sólo la sal y el hash están en `ADMIN_AUTH`, la contraseña nunca se guarda en texto legible, y el desbloqueo vive en `sessionStorage` hasta cerrar la pestaña o pulsar «Cerrar admin».
 
 > ⚠️ **Esta contraseña es pública.** Está escrita en este archivo, que se publica junto a la aplicación en un repositorio abierto: cualquiera que lea el README puede abrir el panel. Mientras no se cambie, el control **sólo evita el manejo accidental**, no el acceso deliberado.
 

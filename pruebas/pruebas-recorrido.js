@@ -9,7 +9,7 @@ const APP = require("node:url").pathToFileURL(path.resolve(process.argv[2])).hre
 
 /* Contraseña administrativa con la que se publica la aplicación. Si usted la
    cambia siguiendo el README, exporte ADMIN_PASSWORD antes de ejecutar el banco. */
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin-ACC-2026!";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Hacienda-CR-1262!";
 
 /**
  * Abre Google Chrome si está instalado y, si no, el Chromium que incluye
