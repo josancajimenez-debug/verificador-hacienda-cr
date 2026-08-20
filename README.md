@@ -6,6 +6,8 @@ Referencia técnica única: <https://api.hacienda.go.cr/docs>
 
 **Un único archivo `index.html`, verdaderamente autónomo**: HTML, CSS, JavaScript, el logo de ACC Contadores y el icono del sitio van todos dentro. Sin dependencias, sin compilación, sin backend y sin ningún archivo vecino. Funciona en computadoras, tabletas y teléfonos móviles.
 
+> **Nota sobre el tamaño.** El archivo pesa cerca de 12&nbsp;MB porque el [Módulo 9](#módulo-9--pymes-activas-búsqueda-local) incrusta 38&nbsp;106 registros del registro nacional de PYMES activas para poder buscarlos sin conexión. Es una decisión deliberada, no un descuido: los demás módulos pesan lo normal para un sitio de este tipo.
+
 ---
 
 ## Índice
@@ -63,7 +65,7 @@ VERIFICADOR/
     ├── pruebas-comportamiento.js ← 35 pruebas del manual modal, acceso admin, paneles y teclado.
     ├── pruebas-navegador.js   ← 58 pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-calidad.js     ← 14 pruebas de memoria, seguridad y contraste.
-    ├── pruebas-recorrido.js   ← 48 pasos por toda la interfaz, sin tolerar errores.
+    ├── pruebas-recorrido.js   ← 49 pasos por toda la interfaz, sin tolerar errores.
     ├── pruebas-sitio-publicado.js ← 10 pruebas contra la URL pública ya desplegada.
     └── capturas/              ← Capturas de pantalla y un CSV exportado real.
 ```
@@ -75,7 +77,7 @@ El archivo está dividido en dieciséis secciones numeradas y comentadas. Busque
 | Sección | Contenido |
 |---|---|
 | § 1 | Estilos: tokens de diseño, temas claro/oscuro, componentes, adaptación móvil |
-| § 2 | Marcado de la interfaz (encabezado, pestañas, ocho paneles, pie) |
+| § 2 | Marcado de la interfaz (encabezado, pestañas, nueve paneles, pie) |
 | § 3 | Utilidades DOM y de formato (`el()`, fechas, números, CSV, portapapeles) |
 | § 4 | Configuración, rutas oficiales y catálogos |
 | § 5 | Caché temporal en memoria |
@@ -83,7 +85,7 @@ El archivo está dividido en dieciséis secciones numeradas y comentadas. Busque
 | § 7 | Cliente HTTP: `apiGet()`, errores tipificados, timeout, reintentos, sonda CORS |
 | § 8 | Componente `DataTable`: filtro, orden, paginación, CSV, copiado |
 | § 9 | Infraestructura de interfaz: pestañas, tema, alertas, estado de red |
-| § 10–15C | Un bloque por módulo, ocho en total (validación → consulta → presentación) |
+| § 10–15D | Un bloque por módulo, nueve en total (validación → consulta → presentación) |
 | § 16 | Arranque |
 
 Cada módulo sigue siempre el mismo patrón, lo que facilita añadir uno nuevo:
@@ -116,17 +118,21 @@ A diferencia de los módulos anteriores, este no consulta ninguna API: busca sob
 
 Igual que el módulo anterior, no consulta ninguna API: busca sobre una lista de 236 bienes transcrita del artículo 5 del texto vigente del Decreto Ejecutivo N.º 43790-H-MEIC-S, que reglamenta la lista de bienes de la Canasta Básica Tributaria por el Bienestar Integral de las Familias (CBTBIF) creada por la Ley N.º 9914, agrupados en sus 20 categorías oficiales (panes y cereales, lácteos, carnes, aceites, frutas y vegetales, artículos de higiene y limpieza del hogar, entre otras), embebida en el propio `index.html`. Funciona sin conexión. El botón «Ver texto oficial y conceptos» abre el texto completo de la norma en SINALEVI en una pestaña nueva, con la misma naturaleza de enlace de navegación deliberado que el del Módulo 7.
 
+### Módulo 9 · PYMES activas (búsqueda local)
+
+Busca por cédula, nombre o razón social sobre una copia local de 38 106 registros del reporte oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), con corte al 31 de julio de 2026, embebida en el propio `index.html`. Funciona sin conexión, con un filtro adicional por provincia. Es la única excepción a la regla de "no incrustar el registro completo" que se explica más abajo: aun sabiendo que el archivo pesa más de 11 MB y que quedará fijo en ese corte, se optó por incrustarlo porque así se pidió explícitamente, con conocimiento del costo en tamaño y de que no se actualiza solo.
+
+Los datos se descargaron directamente del CSV oficial que publica el MEIC (mismo dominio que la página de transparencia), no de una conversión de PDF: un primer intento de usar un archivo convertido a Markdown resultó en texto corrupto (nombres y cédulas repetidos sin sentido, típico de una OCR fallida) y se descartó antes de escribir una sola línea de datos en la aplicación — la misma exigencia de "solo datos reales verificables" que rige el resto de la aplicación.
+
 ### PYMES · acceso directo a la lista oficial (sin panel propio)
 
-Al final de la barra de pestañas, marcado con ↗ y borde discontinuo para distinguirlo de un módulo real, hay un enlace «PYMES» que no abre un panel de consulta: lleva directamente a la página oficial de transparencia del Ministerio de Economía, Industria y Comercio (MEIC), en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls) con el listado de empresas con condición PYME activa.
-
-Esa página no se incrusta en `index.html`: el archivo más reciente pesa más de 10 MB, tiene cerca de 41 500 registros y se publica cada mes; ni el archivo descargable ni la página que lo sirve envían cabeceras CORS, así que un `fetch()` desde `github.io` no podría leer la respuesta, y una copia local sería una fotografía de un mes concreto que quedaría desactualizada dentro de la propia aplicación en cuanto el MEIC publicara el siguiente mes. Enlazar a la página oficial evita ambos problemas.
+Al final de la barra de pestañas, marcado con ↗ y borde discontinuo para distinguirlo de un módulo real, hay un enlace «PYMES» que no abre un panel de consulta: lleva directamente a la página oficial de transparencia del Ministerio de Economía, Industria y Comercio (MEIC), en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls) con el listado de empresas con condición PYME activa. Es el complemento natural del Módulo 9: ahí se consulta la condición vigente el día de hoy, no la fotografía del 31 de julio de 2026 que vive dentro de la aplicación.
 
 > **Nota.** El MEIC también publica, en `meic.go.cr/tramites-y-servicios/pymes-activas/`, una tabla en vivo (buscable por nombre o cédula, actualizada a diario) con el mismo registro. No es la página enlazada por el botón «PYMES» —se prefirió apuntar a la fuente de transparencia oficial que referencia la bibliografía—, pero es la opción a considerar si en el futuro se prioriza la búsqueda de una empresa puntual sobre la descarga del listado mensual completo.
 
 ### Accesos externos de la cabecera
 
-Además de los ocho módulos de consulta y del enlace «PYMES», la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+Además de los nueve módulos de consulta y del enlace «PYMES», la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
 
 | Botón | Destino | Para qué sirve |
 |---|---|---|

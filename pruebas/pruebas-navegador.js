@@ -55,8 +55,8 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     (await page.title()).includes("Verificador Hacienda CR"),
     await page.locator(".brand__title").textContent());
 
-  check("Los 8 módulos están declarados como pestañas",
-    (await page.locator('[role="tab"]').count()) === 8,
+  check("Los 9 módulos están declarados como pestañas",
+    (await page.locator('[role="tab"]').count()) === 9,
     (await page.locator('[role="tab"]').allTextContents()).map(s => s.trim()).join(" · "));
 
   /* ---- Logo institucional ---- */
