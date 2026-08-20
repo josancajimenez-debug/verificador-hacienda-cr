@@ -108,6 +108,10 @@ validar entrada  →  apiGet(ruta, parámetros)  →  render…()  →  showAler
 
 Todos apuntan al origen `https://api.hacienda.go.cr`. No se emplea ningún servicio de terceros, ningún endpoint no documentado y ningún dato simulado.
 
+### Módulo 7 · Insumos con tarifa reducida del 1 % (búsqueda local)
+
+A diferencia de los módulos anteriores, este no consulta ninguna API: busca sobre una lista de 703 registros transcrita de los cuatro anexos del Decreto Ejecutivo N.º 41824-H-MAG (insumos agropecuarios y veterinarios, maquinaria, insumos de pesca no deportiva y servicios a productores de Canasta Básica Tributaria), embebida en el propio `index.html`. Funciona sin conexión. El botón «Ver texto oficial y conceptos» abre el texto completo de la norma en SINALEVI (Procuraduría General de la República) en una pestaña nueva; es, junto con «Verificar comprobante» y «Asistente virtual», uno de los pocos enlaces de navegación externos que la aplicación ofrece de forma deliberada (véase la sección siguiente).
+
 ### Accesos externos de la cabecera
 
 Además de los seis módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.

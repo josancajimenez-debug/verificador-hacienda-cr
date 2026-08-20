@@ -88,7 +88,7 @@ jobs:
       - name: Comprobar que no se cargan recursos externos
         run: |
           # La aplicación debe seguir siendo un archivo autónomo
-          if grep -oE '(src|href)="https?://[^"]*"' index.html | grep -vE '(api\.hacienda\.go\.cr/docs|ovitribucr\.hacienda\.go\.cr|josancajimenez-debug\.github\.io)'; then
+          if grep -oE '(src|href)="https?://[^"]*"' index.html | grep -vE '(api\.hacienda\.go\.cr/docs|ovitribucr\.hacienda\.go\.cr|josancajimenez-debug\.github\.io|sinalevi\.go\.cr)'; then
             echo "Hay un recurso externo que no es un enlace de navegación"
             exit 1
           fi
