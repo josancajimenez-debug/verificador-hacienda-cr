@@ -118,12 +118,15 @@ Igual que el módulo anterior, no consulta ninguna API: busca sobre una lista de
 
 ### Accesos externos de la cabecera
 
-Además de los ocho módulos de consulta, la barra de herramientas ofrece dos accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
+Además de los ocho módulos de consulta, la barra de herramientas ofrece tres accesos que **no son endpoints**: son enlaces que se abren en una pestaña nueva, con `rel="noopener noreferrer"`.
 
 | Botón | Destino | Para qué sirve |
 |---|---|---|
 | ✅ Verificar comprobante | `ovitribucr.hacienda.go.cr/tico/comprobante/comprobante-electronico/` | Verificador oficial de comprobantes electrónicos del Ministerio de Hacienda |
+| 🏢 PYMES | `meic.go.cr/tramites-y-servicios/pymes-activas/` | Buscador oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), con más de 41 000 registros actualizados a diario |
 | 💬 Asistente virtual | `josancajimenez-debug.github.io/acc-asistente/` | Asistente Virtual de ACC Contadores: consultas contables y tributarias, agendamiento de citas, cotizaciones y facturación electrónica |
+
+El buscador de PYMES no se incrusta en `index.html` a propósito: el listado completo pesa más de 10 MB, se genera a diario y ni el archivo descargable ni la tabla que lo sirve envían cabeceras CORS, así que un `fetch()` desde `github.io` no podría leer la respuesta. Enlazar al buscador oficial de MEIC evita ambos problemas y entrega una consulta siempre vigente, en vez de una fotografía mensual que quedaría desactualizada en la propia aplicación.
 
 El Asistente virtual está también accesible desde el pie de página, junto a los datos de contacto, para quien llegue al final de una consulta y necesite acompañamiento profesional para interpretar el resultado.
 
