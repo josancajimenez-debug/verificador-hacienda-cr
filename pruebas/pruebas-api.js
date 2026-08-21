@@ -37,7 +37,27 @@ const sandbox = {
     getElementById: () => fakeElement(), querySelector: () => null, querySelectorAll: () => [],
     addEventListener: () => {}, execCommand: () => true
   },
-  window: { isSecureContext: false, addEventListener(){} },
+  window: {
+    isSecureContext: false, addEventListener(){},
+    /* createClient() se llama al cargar el script (const sb = ...) e
+       initMembership() registra sb.auth.onAuthStateChange() al arrancar;
+       este banco nunca ejercita la membresía, sólo necesita que no reviente. */
+    supabase: {
+      createClient: () => ({
+        auth: {
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
+          getSession: async () => ({ data: { session: null } }),
+          signInWithPassword: async () => ({ error: null }),
+          signUp: async () => ({ error: null }),
+          signOut: async () => ({ error: null }),
+          resetPasswordForEmail: async () => ({ error: null }),
+          updateUser: async () => ({ error: null })
+        },
+        from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }), insert: async () => ({ error: null }) }),
+        rpc: async () => ({ error: null })
+      })
+    }
+  },
   navigator: { onLine: true, clipboard: null },
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
   fetch: globalThis.fetch.bind(globalThis),          // fetch REAL de Node 18+

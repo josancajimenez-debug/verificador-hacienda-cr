@@ -49,7 +49,31 @@ const document = {
 const sandbox = {
   console,
   document,
-  window: { isSecureContext: false, addEventListener(){} },
+  window: {
+    isSecureContext: false, addEventListener(){},
+    /* createClient() se llama al cargar el script (const sb = ...) e
+       initMembership() registra sb.auth.onAuthStateChange() al arrancar,
+       aunque este banco nunca ejercite la membresía en sí (los métodos que
+       sólo se usan dentro de manejadores de eventos, que aquí jamás se
+       disparan porque el DOM simulado no invoca callbacks, no hace falta
+       simularlos con más detalle que "no revienta al construirse").
+       */
+    supabase: {
+      createClient: () => ({
+        auth: {
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
+          getSession: async () => ({ data: { session: null } }),
+          signInWithPassword: async () => ({ error: null }),
+          signUp: async () => ({ error: null }),
+          signOut: async () => ({ error: null }),
+          resetPasswordForEmail: async () => ({ error: null }),
+          updateUser: async () => ({ error: null })
+        },
+        from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }), insert: async () => ({ error: null }) }),
+        rpc: async () => ({ error: null })
+      })
+    }
+  },
   navigator: { onLine: true, clipboard: null },
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
   location: { href: "http://localhost/" },
