@@ -17,14 +17,20 @@ const URL_SIMULADA = "https://verificador-test.supabase.co";
 const ANON_KEY_SIMULADA = "clave-simulada-anonima";
 const REF_SIMULADA = "verificador-test";
 
-/** Devuelve el contenido de index.html con el proyecto simulado en vez de los marcadores PENDIENTE_*. */
+/**
+ * Devuelve el contenido de index.html con el proyecto simulado en vez de
+ * cualquier valor que tengan hoy SUPABASE_URL/SUPABASE_ANON_KEY — sean los
+ * marcadores PENDIENTE_* (copia sin configurar) o credenciales reales de un
+ * proyecto ya conectado. El banco no debe depender de cuál de los dos casos
+ * esté commiteado en index.html.
+ */
 function htmlConSupabaseSimulado(rutaIndex) {
   const original = fs.readFileSync(rutaIndex, "utf8");
   const parcheado = original
-    .replace('"PENDIENTE_SUPABASE_URL"', JSON.stringify(URL_SIMULADA))
-    .replace('"PENDIENTE_SUPABASE_ANON_KEY"', JSON.stringify(ANON_KEY_SIMULADA));
+    .replace(/const SUPABASE_URL = "[^"]*";/, `const SUPABASE_URL = ${JSON.stringify(URL_SIMULADA)};`)
+    .replace(/const SUPABASE_ANON_KEY = "[^"]*";/, `const SUPABASE_ANON_KEY = ${JSON.stringify(ANON_KEY_SIMULADA)};`);
   if (parcheado === original) {
-    throw new Error("No se encontraron los marcadores PENDIENTE_SUPABASE_* en index.html");
+    throw new Error("No se encontraron las constantes SUPABASE_URL/SUPABASE_ANON_KEY en index.html");
   }
   return parcheado;
 }
