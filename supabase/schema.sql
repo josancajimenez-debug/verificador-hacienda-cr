@@ -157,11 +157,29 @@ $$;
 alter table public.profiles enable row level security;
 alter table public.payments enable row level security;
 
+-- Una política de RLS sobre "profiles" no puede consultar "profiles" dentro
+-- de su propia condición: Postgres la vuelve a evaluar para esa misma
+-- subconsulta y entra en un ciclo infinito ("infinite recursion detected in
+-- policy for relation profiles"). La salida estándar es aislar esa
+-- comprobación en una función security definer: al correr con privilegios
+-- de servidor, su SELECT interno no vuelve a pasar por RLS.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin');
+$$;
+
+grant execute on function public.is_admin() to authenticated;
+
 -- profiles: cada quien ve su propio perfil; un admin ve todos.
 create policy "profiles_select_propio_o_admin" on public.profiles
   for select using (
     auth.uid() = id
-    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+    or public.is_admin()
   );
 
 -- profiles: nadie inserta desde el cliente (lo hace el disparador con
@@ -186,7 +204,7 @@ create policy "payments_insert_propio" on public.payments
 create policy "payments_select_propio_o_admin" on public.payments
   for select using (
     auth.uid() = user_id
-    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
+    or public.is_admin()
   );
 
 -- payments: nadie actualiza directamente (ni siquiera un admin) — el único
