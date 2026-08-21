@@ -644,7 +644,8 @@ Toda la aplicación queda detrás de un inicio de sesión. Esta sección explica
 2. En el **SQL Editor** del proyecto, ejecute el contenido de [`supabase/schema.sql`](supabase/schema.sql) una sola vez. Crea las tablas `profiles` y `payments`, el disparador que da de alta el perfil al registrarse, la función `confirm_payment()` y las políticas de Row Level Security.
 3. Confirme que **Authentication → Providers → Email → "Confirm email"** está activo (lo está por defecto): sin eso, cualquiera podría registrarse con un correo ajeno.
 4. En `index.html`, busque las constantes `SUPABASE_URL` y `SUPABASE_ANON_KEY` (§ 4) y reemplace los dos marcadores `"PENDIENTE_SUPABASE_URL"` / `"PENDIENTE_SUPABASE_ANON_KEY"` por los de su proyecto (**Project Settings → API**). Mientras sigan como marcadores, la aplicación se degrada a un aviso claro en la pantalla de ingreso en vez de romperse — no publique así, pero tampoco es un archivo inservible mientras lo configura.
-5. Regístrese normalmente desde la propia aplicación y, en el SQL Editor, asígnese el rol de administrador:
+5. En **Authentication → URL Configuration**, cambie **Site URL** (que por defecto es `http://localhost:3000`) por la URL pública donde queda publicada la aplicación (por ejemplo `https://usuario.github.io/repositorio/`), y añádala también en **Redirect URLs**. Si se omite este paso, los enlaces que Supabase envía por correo — confirmación de registro y «¿Olvidó su contraseña?» — apuntan a `localhost:3000` y fallan con `ERR_CONNECTION_REFUSED` en cuanto la persona los abre desde su propio computador.
+6. Regístrese normalmente desde la propia aplicación y, en el SQL Editor, asígnese el rol de administrador:
    ```sql
    update public.profiles set role = 'admin' where id =
      (select id from auth.users where email = 'su-correo@ejemplo.com');
