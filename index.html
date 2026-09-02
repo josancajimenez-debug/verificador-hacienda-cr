@@ -3224,6 +3224,10 @@ const PORTALES_OFICIALES = {
   incopesca: {
     url: "https://www.incopesca.go.cr/tramites_servicios/",
     texto: "Trámites y servicios del INCOPESCA"
+  },
+  tribuCR: {
+    url: "https://ovitribucr.hacienda.go.cr/ConsultaPublica/",
+    texto: "Consulta pública de situación tributaria en TRIBU-CR (Ministerio de Hacienda)"
   }
 };
 
@@ -4084,6 +4088,36 @@ function renderTributaria(d, identificacion) {
     out.appendChild(el("p", { className: "hint",
       text: "Interpretación de los códigos: en el campo Tipo, P = principal y S = secundaria; en Estado, A = activa e I = inactiva. La API devuelve únicamente la letra, que se muestra entre paréntesis." }));
   }
+
+  // --- Aviso sobre datos adicionales de TRIBU-CR --------------------------
+  // El servicio público que consume este módulo (api.hacienda.go.cr/fe/ae,
+  // pensado para la facturación electrónica) sólo expone nombre, tipo de
+  // identificación, régimen, situación y actividades económicas — verificado
+  // contra la API real, que responde exactamente esos campos y ningún otro.
+  // Desde octubre de 2025, la consulta pública de TRIBU-CR (que reemplazó a
+  // ATV) sí muestra además Obligaciones tributarias, Detalle de regímenes
+  // especiales, Autorizaciones especiales y Factores de retención, pero los
+  // sirve mediante un API interno propio de esa aplicación (POST, protegido
+  // por Akamai Bot Manager y sin cabeceras CORS para orígenes de terceros),
+  // no un servicio público documentado como el que usa este verificador. Por
+  // eso esa información no puede incorporarse aquí de forma confiable; se
+  // ofrece en su lugar el enlace a la fuente oficial que sí la tiene.
+  const cont = el("div");
+  cont.appendChild(el("div", { className: "alert alert--info" }, [
+    el("span", { className: "alert__ico", text: "ℹ️", attrs: { "aria-hidden": "true" } }),
+    el("div", { className: "alert__body" }, [
+      el("div", { className: "alert__title", text: "Datos adicionales disponibles en TRIBU-CR" }),
+      el("div", { text: "El servicio público de Hacienda que usa este módulo no incluye obligaciones tributarias por impuesto, detalle de regímenes especiales, autorizaciones especiales ni factores de retención. Esa información sí aparece en la consulta pública oficial de TRIBU-CR." }),
+      el("div", { className: "alert__detail" }, [
+        el("a", {
+          text: PORTALES_OFICIALES.tribuCR.texto,
+          attrs: { href: PORTALES_OFICIALES.tribuCR.url, target: "_blank", rel: "noopener noreferrer" }
+        }),
+        el("span", { text: " (se abre en una pestaña nueva)" })
+      ])
+    ])
+  ]));
+  out.appendChild(cont);
 
   out.appendChild(bloqueCrudo(d));
   return true;
