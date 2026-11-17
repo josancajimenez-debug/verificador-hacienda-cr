@@ -8,7 +8,7 @@
 const { chromium } = require("playwright");
 const path = require("node:path");
 const fs = require("node:fs");
-const { cargarConSesionSimulada } = require("./_membresia-simulada.js");
+const { pathToFileURL } = require("node:url");
 
 // Se admite ruta relativa o absoluta: se resuelve siempre a una ruta de archivo
 const RUTA_INDEX = path.resolve(process.argv[2]);
@@ -44,10 +44,7 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
   page.on("pageerror", (e) => erroresConsola.push("pageerror: " + e.message));
   page.on("console", (m) => { if (m.type() === "error") erroresConsola.push("console.error: " + m.text()); });
 
-  // La app vive detrás de la membresía: se simula una sesión con plan
-  // vigente (sin tocar Supabase real) para que este banco pueda seguir
-  // ejercitando los módulos con consultas reales a api.hacienda.go.cr.
-  await cargarConSesionSimulada(page, RUTA_INDEX, { role: "admin" });
+  await page.goto(pathToFileURL(RUTA_INDEX).href, { waitUntil: "load" });
   await esperar(400);
 
   console.log("\nPRUEBAS EN NAVEGADOR REAL (Chrome)\n" + "=".repeat(100));
@@ -81,15 +78,13 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     Math.abs(logoInfo.aspectoDeclarado - logoInfo.aspectoReal) < 0.02,
     `declarado=${logoInfo.aspectoDeclarado.toFixed(3)}, real=${logoInfo.aspectoReal.toFixed(3)}`);
 
-  check("La página no carga recursos externos fuera de la allowlist",
+  check("La página no carga recursos externos",
     await page.evaluate(() => ![...document.querySelectorAll("img,script,link,iframe")]
       .some((n) => {
         const url = n.getAttribute("src") || n.getAttribute("href") || "";
-        // cdn.jsdelivr.net es la única excepción: sirve el SDK de Supabase
-        // que la membresía necesita (ver README, sección de arquitectura).
-        return /^https?:/i.test(url) && !url.startsWith("https://cdn.jsdelivr.net/");
+        return /^https?:/i.test(url);
       })),
-    "sin src/href http(s) fuera de la allowlist: no depende de CDN de fuentes ni imágenes de terceros");
+    "sin src/href http(s): no depende de CDN de fuentes ni imágenes de terceros");
 
   // El logo debe ir incrustado: así el HTML se puede enviar suelto por correo
   // sin que la cabecera aparezca rota.
@@ -439,7 +434,7 @@ const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
     isMobile: true, hasTouch: true, locale: "es-CR"
   });
   const pm = await movil.newPage();
-  await cargarConSesionSimulada(pm, RUTA_INDEX, { role: "admin" });
+  await pm.goto(pathToFileURL(RUTA_INDEX).href, { waitUntil: "load" });
   await esperar(300);
 
   await pm.click("#tab-cabys");

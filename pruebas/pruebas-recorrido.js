@@ -5,7 +5,7 @@
  */
 const { chromium } = require("playwright");
 const path = require("node:path");
-const { cargarConSesionSimulada } = require("./_membresia-simulada.js");
+const { pathToFileURL } = require("node:url");
 const RUTA_INDEX = path.resolve(process.argv[2]);
 
 /* Contraseña administrativa con la que se publica la aplicación. Si usted la
@@ -70,10 +70,7 @@ function registrar(tipo, texto, contexto) {
     catch (e) { incidencias.push({ tipo: "FALLO DEL PASO", texto: e.message.split("\n")[0].slice(0, 160), contexto }); }
   };
 
-  // La app vive detrás de la membresía: se simula una sesión con plan
-  // vigente (sin tocar Supabase real) para que este recorrido "sin red"
-  // pueda seguir ejercitando todos los flujos internos como siempre.
-  await cargarConSesionSimulada(p, RUTA_INDEX, { role: "admin" });
+  await p.goto(pathToFileURL(RUTA_INDEX).href, { waitUntil: "load" });
   await esperar(500);
 
   /* ============ 1. Recorrido de todas las pestañas y sus guías ============ */

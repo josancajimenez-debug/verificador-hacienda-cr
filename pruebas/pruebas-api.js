@@ -38,25 +38,7 @@ const sandbox = {
     addEventListener: () => {}, execCommand: () => true
   },
   window: {
-    isSecureContext: false, addEventListener(){},
-    /* createClient() se llama al cargar el script (const sb = ...) e
-       initMembership() registra sb.auth.onAuthStateChange() al arrancar;
-       este banco nunca ejercita la membresía, sólo necesita que no reviente. */
-    supabase: {
-      createClient: () => ({
-        auth: {
-          onAuthStateChange: () => ({ data: { subscription: { unsubscribe(){} } } }),
-          getSession: async () => ({ data: { session: null } }),
-          signInWithPassword: async () => ({ error: null }),
-          signUp: async () => ({ error: null }),
-          signOut: async () => ({ error: null }),
-          resetPasswordForEmail: async () => ({ error: null }),
-          updateUser: async () => ({ error: null })
-        },
-        from: () => ({ select: () => ({ eq: () => ({ single: async () => ({ data: null, error: null }) }) }), insert: async () => ({ error: null }) }),
-        rpc: async () => ({ error: null })
-      })
-    }
+    isSecureContext: false, addEventListener(){}
   },
   navigator: { onLine: true, clipboard: null },
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },

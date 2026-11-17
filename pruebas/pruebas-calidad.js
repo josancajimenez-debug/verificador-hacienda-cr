@@ -5,7 +5,7 @@
  */
 const { chromium } = require("playwright");
 const path = require("node:path");
-const { cargarConSesionSimulada } = require("./_membresia-simulada.js");
+const { pathToFileURL } = require("node:url");
 const RUTA_INDEX = path.resolve(process.argv[2]);
 
 /**
@@ -42,10 +42,7 @@ function contraste(c1, c2) {
   const p = await ctx.newPage();
   const excepciones = [];
   p.on("pageerror", (e) => excepciones.push(e.message));
-  // La app vive detrás de la membresía: se simula una sesión con plan
-  // vigente (sin tocar Supabase real) para poder seguir auditando memoria,
-  // seguridad y contraste dentro de #contenido como siempre.
-  await cargarConSesionSimulada(p, RUTA_INDEX, { role: "admin" });
+  await p.goto(pathToFileURL(RUTA_INDEX).href, { waitUntil: "load" });
   await esperar(400);
 
   console.log("\nCALIDAD: MEMORIA, SEGURIDAD Y CONTRASTE\n" + "=".repeat(84));
