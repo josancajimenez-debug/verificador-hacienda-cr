@@ -9,7 +9,7 @@ API consultada: `https://api.hacienda.go.cr` (servicios oficiales, sin datos sim
 | 1 · Lógica pura | 107 | 107 | 0 |
 | 2 · Integración con la API oficial | 16 | 16 | 0 |
 | 3 · Estructura y accesibilidad del DOM | 13 | 13 | 0 |
-| 4 · Comportamiento (manual modal, acceso admin, paneles, teclado) | 35 | 35 | 0 |
+| 4 · Comportamiento (manual modal, configuración avanzada, paneles, teclado) | 26 | 26 | 0 |
 | 5 · Calidad: memoria, seguridad y contraste | 14 | 14 | 0 |
 | 6 · Recorrido exhaustivo (46 pasos, consola limpia) | 46 | 46 | 0 |
 | 7 · Navegador real (Chrome) | 58 | 58 | 0 |
@@ -667,7 +667,6 @@ También se descartó una tanda de «símbolos sin usar» del análisis estátic
 · Doble clic sobre Consultar
 · Manual: apertura, los seis enlaces del índice y cierre con Escape
 · Tema: ciclo completo de los tres modos
-· Acceso admin: contraseña incorrecta rechazada y contraseña correcta aceptada
 · Configuración: guardar, proxy inválido, proxy inseguro y restablecer
 · Limpiar caché
 · Pérdida de conexión y recuperación
@@ -678,52 +677,13 @@ Resultado: **ninguna excepción, ningún error ni advertencia de consola, ningú
 
 ---
 
-## 6 quinquies. Acceso administrativo a la configuración avanzada
+## 6 quinquies. Configuración avanzada sin contraseña
 
-La configuración avanzada dejó de estar a la vista de cualquier visitante: ahora se
-desbloquea con una contraseña que el navegador comprueba mediante **PBKDF2-SHA-256 con
-210 000 iteraciones**. En el archivo sólo viajan la sal y el hash; la contraseña no se
-guarda nunca en texto legible, y la comparación del resultado se hace en tiempo constante.
-
-### Lo que se comprobó
-
-```text
-· La configuración no es visible al cargar la página
-· El botón arranca en estado bloqueado y así lo declara (data-admin="locked")
-· El acceso se pide en un <dialog> modal con nombre accesible
-· El campo usa type="password", de modo que no se muestra en pantalla
-· Escape cierra el diálogo sin conceder acceso
-· Una contraseña incorrecta produce aviso y NO revela la configuración
-· La contraseña correcta la muestra y el botón pasa a «Cerrar admin»
-· La contraseña no aparece en localStorage, sessionStorage ni cookies
-· El desbloqueo sobrevive a una recarga de la misma pestaña
-· «Cerrar admin» vuelve a ocultarla y borra la marca de sesión
-```
-
-Doce casos en el banco 4 y un paso más en el recorrido: **13 comprobaciones nuevas, todas
-correctas**. El banco 5 se reforzó además para verificar la privacidad *en el peor caso*:
-con la sesión administrativa abierta, `sessionStorage` contiene únicamente la marca
-`verificadorHaciendaCR.adminUnlocked=1`, sin ninguna identificación consultada.
-
-### Alcance real de este control — declarado, no supuesto
-
-Conviene no exagerar lo que aporta. La aplicación es un archivo estático que se descarga
-completo en el navegador de cada visitante, de modo que **este control evita el manejo
-accidental, no el acceso deliberado**: quien edite el JavaScript en su propio navegador
-puede saltárselo. Dos observaciones honestas al respecto:
-
-1. **La contraseña de reparto es pública.** Figura en el `README.md`, que se publica en el
-   mismo repositorio abierto que la aplicación. Mientras no se cambie, cualquiera que lea
-   la documentación puede abrir el panel. El README lo advierte de forma expresa y explica
-   cómo generar una sal y un hash nuevos.
-2. **Detrás del portón no hay ningún secreto.** Los dos ajustes del panel —duración de la
-   caché y dirección de un proxy propio— se guardan en el `localStorage` de cada visitante
-   y sólo afectan a su propia sesión: no hay configuración compartida que un tercero pueda
-   alterar para los demás. Por eso la exposición de la contraseña es un defecto de
-   coherencia, no una vía de compromiso.
-
-Para proteger algo que sí fuera sensible, el área administrativa tendría que trasladarse a
-un backend autenticado; con una arquitectura estática no hay forma de lograrlo.
+El acceso administrativo por contraseña se retiró: la configuración avanzada (duración de
+la caché y proxy propio) es ahora una sección plegable visible para cualquier visitante.
+Sus ajustes se guardan en el `localStorage` de cada navegador y sólo afectan a esa
+persona. El banco 4 comprueba que no queda ningún botón, diálogo ni campo de contraseña,
+y que la sección se ve plegada al cargar la página.
 
 ---
 
@@ -747,7 +707,7 @@ npm test
 npm run test:logica         # validadores y normalizadores
 npm run test:api            # integración contra la API real
 npm run test:estructura     # DOM, ARIA, anidamiento
-npm run test:comportamiento # manual modal, acceso admin, paneles, teclado
+npm run test:comportamiento # manual modal, configuración avanzada, paneles, teclado
 npm run test:calidad        # memoria, seguridad y contraste
 npm run test:recorrido      # 46 pasos, sin tolerar errores de consola
 npm run test:navegador      # interfaz completa y capturas

@@ -8,7 +8,7 @@ Referencia técnica única: <https://api.hacienda.go.cr/docs>
 
 **Acceso libre.** Cualquier persona con el enlace puede usar la aplicación: no hay inicio de sesión, registro ni membresía.
 
-> **Nota sobre el tamaño.** El archivo pesa cerca de 12&nbsp;MB porque el [Módulo 9](#módulo-9--pymes-activas-búsqueda-local) incrusta 38&nbsp;106 registros del registro nacional de PYMES activas para poder buscarlos sin conexión. Es una decisión deliberada, no un descuido: los demás módulos pesan lo normal para un sitio de este tipo.
+> **Nota sobre el tamaño.** El archivo pesa cerca de 14&nbsp;MB porque el [Módulo 9](#módulo-9--pymes-activas-búsqueda-local) incrusta 41&nbsp;924 registros del registro nacional de PYMES activas para poder buscarlos sin conexión. Es una decisión deliberada, no un descuido: los demás módulos pesan lo normal para un sitio de este tipo.
 
 ---
 
@@ -64,7 +64,7 @@ VERIFICADOR/
     ├── pruebas-logica.js      ← 107 pruebas de validadores, normalizadores, registros y preferencias.
     ├── pruebas-api.js         ← 16 pruebas de integración contra la API real.
     ├── pruebas-estructura.js  ← Auditorías del DOM (ids, ARIA, anidamiento, alt…).
-    ├── pruebas-comportamiento.js ← Manual modal, acceso admin, paneles y teclado.
+    ├── pruebas-comportamiento.js ← Manual modal, configuración avanzada, paneles y teclado.
     ├── pruebas-navegador.js   ← Pruebas en Chrome (interfaz, a11y, móvil).
     ├── pruebas-calidad.js     ← Memoria, seguridad y contraste.
     ├── pruebas-recorrido.js   ← Recorrido exhaustivo de la interfaz, sin tolerar errores.
@@ -122,11 +122,11 @@ Igual que el módulo anterior, no consulta ninguna API: busca sobre una lista de
 
 ### Módulo 9 · PYMES activas (búsqueda local)
 
-Busca por cédula, nombre o razón social sobre una copia local de 38 106 registros del reporte oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), con corte al 31 de julio de 2026, embebida en el propio `index.html`. Funciona sin conexión, con un filtro adicional por provincia. Es la única excepción a la regla de "no incrustar el registro completo" que se explica más abajo: aun sabiendo que el archivo pesa más de 11 MB y que quedará fijo en ese corte, se optó por incrustarlo porque así se pidió explícitamente, con conocimiento del costo en tamaño y de que no se actualiza solo.
+Busca por cédula, nombre o razón social sobre una copia local de 41 924 registros del reporte oficial de PYMES activas del Ministerio de Economía, Industria y Comercio (MEIC), con corte al 12 de noviembre de 2026, embebida en el propio `index.html`. Funciona sin conexión, con un filtro adicional por provincia. Es la única excepción a la regla de "no incrustar el registro completo" que se explica más abajo: aun sabiendo que el archivo pesa más de 13 MB y que quedará fijo en ese corte, se optó por incrustarlo porque así se pidió explícitamente, con conocimiento del costo en tamaño y de que no se actualiza solo.
 
 Los datos se descargaron directamente del CSV oficial que publica el MEIC (mismo dominio que la página de transparencia), no de una conversión de PDF: un primer intento de usar un archivo convertido a Markdown resultó en texto corrupto (nombres y cédulas repetidos sin sentido, típico de una OCR fallida) y se descartó antes de escribir una sola línea de datos en la aplicación — la misma exigencia de "solo datos reales verificables" que rige el resto de la aplicación.
 
-Para la condición vigente el día de la consulta (este listado es una fotografía fija del 31 de julio de 2026, no se actualiza sola), el botón "Ver publicación oficial" del propio módulo lleva a la página de transparencia del MEIC, en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls). El MEIC también publica, en `meic.go.cr/tramites-y-servicios/pymes-activas/`, una tabla en vivo (buscable por nombre o cédula, actualizada a diario) con el mismo registro; no es la página enlazada por el módulo —se prefirió apuntar a la fuente de transparencia oficial que referencia la bibliografía—, pero es la opción a considerar si en el futuro se prioriza esa tabla en vivo sobre la descarga del listado mensual completo.
+Para la condición vigente el día de la consulta (este listado es una fotografía fija del 12 de noviembre de 2026, no se actualiza sola), el botón "Ver publicación oficial" del propio módulo lleva a la página de transparencia del MEIC, en `meic.go.cr/transparencia/apoyo-a-la-pequena-y-mediana-empresa/lista-de-pymes-activas/`, donde se publican por mes los archivos descargables (.ods, .pdf, .csv, .xls). El MEIC también publica, en `meic.go.cr/tramites-y-servicios/pymes-activas/`, una tabla en vivo (buscable por nombre o cédula, actualizada a diario) con el mismo registro; no es la página enlazada por el módulo —se prefirió apuntar a la fuente de transparencia oficial que referencia la bibliografía—, pero es la opción a considerar si en el futuro se prioriza esa tabla en vivo sobre la descarga del listado mensual completo.
 
 ### Verificar comprobante · acceso directo en la barra de pestañas (sin panel propio)
 
@@ -294,7 +294,7 @@ Ambas variantes reenvían la petición sin modificarla, aplican una lista blanca
 3. Pulse **Edit code**, borre el contenido de ejemplo y pegue `proxy/worker.js` completo.
 4. **Deploy**. Obtendrá una URL del tipo `https://NOMBRE.SUCUENTA.workers.dev`.
 5. En `proxy/worker.js`, cambie `ORIGENES_PERMITIDOS` de `["*"]` a la lista de dominios donde publique la aplicación, por ejemplo `["https://miusuario.github.io"]`, y vuelva a desplegar.
-6. En la aplicación, pulse **Acceso admin**, ingrese la contraseña y, en **Configuración avanzada**, pegue la URL en «URL de su propio proxy». Guarde.
+6. En la aplicación, abra **Configuración avanzada** (al final de la página) y pegue la URL en «URL de su propio proxy». Guarde.
 
 ### Opción B — Node.js (local o en un servidor propio)
 
@@ -311,7 +311,7 @@ curl "http://localhost:8787/salud"
 # {"code":200,"status":"OK","proxy":"VerificadorHaciendaCR"}
 ```
 
-Después, desbloquee **Acceso admin** y, en **Configuración avanzada**, escriba `http://localhost:8787`.
+Después, en **Configuración avanzada**, escriba `http://localhost:8787`.
 
 > La aplicación sólo acepta direcciones de proxy que usen HTTPS, salvo `localhost` y `127.0.0.1`. Utilice exclusivamente un proxy que usted mismo haya desplegado.
 
@@ -463,9 +463,9 @@ Resultados completos y evidencia en **[`PRUEBAS.md`](PRUEBAS.md)**. Resumen:
 | Lógica pura (validadores, normalizadores, clasificadores, preferencias) | 107 | 107 correctos |
 | Integración contra la API oficial | 16 | 16 correctos |
 | Estructura y accesibilidad del DOM | 13 | 13 correctos |
-| Comportamiento (manual modal, acceso admin, paneles, teclado) | 35 | 35 correctos |
+| Comportamiento (manual modal, configuración avanzada, paneles, teclado) | 26 | 26 correctos |
 | Calidad: memoria, seguridad y contraste | 14 | 14 correctos |
-| Recorrido exhaustivo (consola limpia) | 49 pasos | correctos |
+| Recorrido exhaustivo (consola limpia) | 48 pasos | correctos |
 | Navegador real (Chrome: interfaz, accesibilidad, móvil) | 58 | 58 correctos |
 | Sitio publicado (URL pública real) | 10 | 10 correctos |
 
@@ -513,23 +513,7 @@ node pruebas/pruebas-navegador.js "RUTA/ABSOLUTA/index.html" "pruebas/capturas"
 
 **Cambiar la duración predeterminada de la caché.** Utilice el selector de Configuración avanzada o, para cambiar el valor de fábrica, modifique `TTL_PREDETERMINADO` (§ 4). Si añade una duración nueva, agréguela **a la vez** a `TTL_ADMITIDOS` y a las opciones del `<select id="cfg-ttl">`: esa constante es la lista blanca con la que se validan las preferencias leídas de `localStorage`, y una duración que no figure en ella se sustituye por la predeterminada.
 
-**Acceso a la configuración avanzada.** La contraseña de reparto es `Hacienda-CR-1262!`. El navegador la verifica mediante PBKDF2-SHA-256 (210 000 iteraciones); sólo la sal y el hash están en `ADMIN_AUTH`, la contraseña nunca se guarda en texto legible, y el desbloqueo vive en `sessionStorage` hasta cerrar la pestaña o pulsar «Cerrar admin».
-
-> ⚠️ **Esta contraseña es pública.** Está escrita en este archivo, que se publica junto a la aplicación en un repositorio abierto: cualquiera que lea el README puede abrir el panel. Mientras no se cambie, el control **sólo evita el manejo accidental**, no el acceso deliberado.
-
-Para generar una sal y un hash nuevos, cambie `SU-CONTRASEÑA` y ejecute:
-
-```bash
-node -e "const c=require('crypto');const s=c.randomBytes(16);console.log('salt:',s.toString('base64'));console.log('hash:',c.pbkdf2Sync('SU-CONTRASEÑA',s,210000,32,'sha256').toString('base64'))"
-```
-
-Copie ambos valores en `ADMIN_AUTH` (§ 4 de `index.html`) y **no escriba la contraseña nueva en ningún archivo del repositorio**. Los bancos de pruebas la leen de la variable de entorno `ADMIN_PASSWORD`:
-
-```bash
-ADMIN_PASSWORD='SU-CONTRASEÑA' npm test
-```
-
-Aun con una contraseña privada, al tratarse de una aplicación estática este control evita el acceso casual pero **no sustituye una autenticación de servidor**: quien pueda editar el JavaScript en su propio navegador puede omitirlo. Conviene recordar qué protege realmente: los dos ajustes del panel —duración de la caché y dirección de un proxy propio— se guardan en el `localStorage` de cada visitante y sólo afectan a su propia sesión. No hay allí ningún secreto ni configuración compartida. Para proteger algo que sí lo sea, el área administrativa debe trasladarse a un backend autenticado.
+**Configuración avanzada.** Es una sección plegable al final de la página, abierta a cualquier visitante y sin contraseña. Sus dos ajustes —duración de la caché y dirección de un proxy propio— se guardan en el `localStorage` de cada navegador y sólo afectan a esa persona; no hay configuración compartida.
 
 **Personalizar los colores institucionales.** Edite las variables `--brand-900`, `--brand-700` y `--brand-500` (§ 1.1); el resto del diseño se adapta automáticamente en ambos temas.
 
